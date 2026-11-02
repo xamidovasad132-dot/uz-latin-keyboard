@@ -1,5 +1,7 @@
 package uz.latin.keyboard;
 
+import android.content.Intent;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
@@ -24,10 +26,10 @@ public class LatinIME extends InputMethodService {
 
     private static final String SHIFT = "SHIFT";
     private static final String DEL = "DEL";
-    private static final String P_A = "P_A";   // @?! / #!?  (belgilar 1-sahifa)
-    private static final String P_B = "P_B";   // ÷\<        (belgilar 2-sahifa)
-    private static final String NUM = "NUM";   // 123        (raqamlar paneli)
-    private static final String ABC = "ABC";   // harflarga qaytish
+    private static final String P_A = "P_A";
+    private static final String P_B = "P_B";
+    private static final String NUM = "NUM";
+    private static final String ABC = "ABC";
     private static final String SPACE = "SPACE";
     private static final String ENTER = "ENTER";
     private static final String TAB = "TAB";
@@ -36,14 +38,25 @@ public class LatinIME extends InputMethodService {
     private static final int SYM_A = 1;
     private static final int SYM_B = 2;
     private static final int NUMPAD = 3;
+    private static final int EMOJI_PAGE = 4;
 
-    // ş = ş, ç = ç, ö = ö, ğ = ğ, ’ = ’
+    // Lotin: ş = ş, ç = ç, ö = ö, ğ = ğ, ’ = ’
     private static final String[][] LETTERS = {
             {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
             {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p"},
             {"a", "s", "d", "f", "g", "h", "j", "k", "l"},
             {"’", "z", "x", "c", "v", "b", "n", "m", "-"},
             {SHIFT, "!", "ş", "ç", "ö", "ğ", "?", DEL},
+            {P_A, NUM, ",", SPACE, ".", ENTER}
+    };
+
+    // Kirill
+    private static final String[][] CYRILLIC = {
+            {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
+            {"й", "ц", "у", "к", "е", "н", "г", "ш", "ў", "з"},
+            {"ф", "қ", "в", "а", "п", "р", "о", "л", "д", "ж"},
+            {"я", "ч", "с", "м", "и", "т", "ь", "б", "ю", "х"},
+            {SHIFT, "ё", "ъ", "э", "ғ", "ҳ", "ы", "щ", DEL},
             {P_A, NUM, ",", SPACE, ".", ENTER}
     };
 
@@ -71,10 +84,18 @@ public class LatinIME extends InputMethodService {
             {ABC, "0", ".", ENTER}
     };
 
+    private static final int[] EMOJI = {
+            0x1F600, 0x1F602, 0x1F60D, 0x1F60A, 0x1F618, 0x1F609, 0x1F604, 0x1F606,
+            0x1F60E, 0x1F622, 0x1F62D, 0x1F621, 0x1F914, 0x1F62E, 0x1F634, 0x1F60B,
+            0x1F44D, 0x1F44F, 0x1F64F, 0x1F4AA, 0x1F44B, 0x1F44C, 0x1F64C, 0x1F91D,
+            0x1F525, 0x1F389, 0x1F381, 0x1F339, 0x1F31F, 0x1F495, 0x1F4AF, 0x1F680
+    };
+
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable repeat;
     private LinearLayout root;
     private boolean caps = false;
+    private boolean cyr = false;
     private int page = LETTERS_PAGE;
 
     @Override
@@ -83,7 +104,7 @@ public class LatinIME extends InputMethodService {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(0xFF1C1C1E);
         int p = dp(4);
-        root.setPadding(p, p, p, p + dp(2));
+        root.setPadding(p, 0, p, p + dp(2));
         build();
         return root;
     }
@@ -98,13 +119,105 @@ public class LatinIME extends InputMethodService {
 
     private void build() {
         root.removeAllViews();
+        root.addView(toolbar());
         if (page == NUMPAD) {
             buildNumpad();
             return;
         }
-        String[][] rows = page == SYM_A ? PAGE_A : (page == SYM_B ? PAGE_B : LETTERS);
+        String[][] rows;
+        if (page == SYM_A) rows = PAGE_A;
+        else if (page == SYM_B) rows = PAGE_B;
+        else if (page == EMOJI_PAGE) rows = emojiRows();
+        else rows = cyr ? CYRILLIC : LETTERS;
         for (String[] r : rows) root.addView(row(r));
     }
+
+    private String[][] emojiRows() {
+        String[][] r = new String[5][];
+        for (int i = 0; i < 4; i++) {
+            r[i] = new String[8];
+            for (int j = 0; j < 8; j++) {
+                r[i][j] = new String(Character.toChars(EMOJI[i * 8 + j]));
+            }
+        }
+        r[4] = new String[]{ABC, SPACE, DEL};
+        return r;
+    }
+
+    // ---- tepadagi qator: O'z | Ўз | globus ....... emoji | sozlama | yopish ----
+
+    private View toolbar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
+
+        bar.addView(tab("O‘z", !cyr, v -> {
+            cyr = false;
+            page = LETTERS_PAGE;
+            caps = false;
+            build();
+        }));
+        bar.addView(tab("Ўз", cyr, v -> {
+            cyr = true;
+            page = LETTERS_PAGE;
+            caps = false;
+            build();
+        }));
+        bar.addView(tool("🌐", v -> showPicker()));
+
+        View sp = new View(this);
+        sp.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
+        bar.addView(sp);
+
+        bar.addView(tool("😊", v -> goTo(EMOJI_PAGE)));
+        bar.addView(tool("⚙", v -> openSettings()));
+        bar.addView(tool("▽", v -> requestHideSelf(0)));
+        return bar;
+    }
+
+    private TextView tab(String text, boolean selected, View.OnClickListener l) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setGravity(Gravity.CENTER);
+        t.setTextSize(19);
+        t.setTextColor(selected ? 0xFFFFFFFF : 0xFF7C7C80);
+        t.setTypeface(null, selected ? Typeface.BOLD : Typeface.NORMAL);
+        t.setPadding(dp(14), 0, dp(14), 0);
+        t.setClickable(true);
+        t.setOnClickListener(l);
+        t.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        return t;
+    }
+
+    private TextView tool(String text, View.OnClickListener l) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setGravity(Gravity.CENTER);
+        t.setTextSize(20);
+        t.setTextColor(0xFFC7C7CC);
+        t.setPadding(dp(14), 0, dp(14), 0);
+        t.setClickable(true);
+        t.setOnClickListener(l);
+        t.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        return t;
+    }
+
+    private void showPicker() {
+        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) imm.showInputMethodPicker();
+    }
+
+    private void openSettings() {
+        Intent i = new Intent(this, SettingsActivity.class);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(i);
+    }
+
+    // ---- raqamlar paneli ----
 
     private void buildNumpad() {
         LinearLayout wrap = new LinearLayout(this);
@@ -208,9 +321,10 @@ public class LatinIME extends InputMethodService {
             case NUM:
                 return "123";
             case ABC:
-                return page == NUMPAD ? "↩" : "ABC";
+                if (page == NUMPAD) return "↩";
+                return cyr ? "АБВ" : "ABC";
             case SPACE:
-                return "O‘zbek";
+                return cyr ? "Ўз" : "O‘z";
             case ENTER:
                 return "↵";
             case TAB:
@@ -225,7 +339,7 @@ public class LatinIME extends InputMethodService {
         t.setGravity(Gravity.CENTER);
         t.setTextColor(0xFFFFFFFF);
         boolean special = isSpecial(k);
-        t.setTextSize(special ? 16 : 20);
+        t.setTextSize(special ? 16 : (page == EMOJI_PAGE ? 24 : 20));
         t.setText(label(k));
         int color = special ? 0xFF2C2C2E : (isHighlight(k) ? 0xFF3D4A66 : 0xFF48484A);
         t.setBackground(bg(color));
@@ -240,8 +354,7 @@ public class LatinIME extends InputMethodService {
             });
             if (k.equals(SPACE)) {
                 t.setOnLongClickListener(v -> {
-                    InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                    if (imm != null) imm.showInputMethodPicker();
+                    showPicker();
                     return true;
                 });
             }
