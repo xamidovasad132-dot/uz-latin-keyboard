@@ -43,6 +43,7 @@ import java.util.regex.Pattern;
 public class MainActivity extends Activity {
 
     private static final String MODEL = "gemini-flash-latest";
+    private static final String PRO = "gemini-pro-latest";
     private static final int PICK = 11;
     private static final int SAFFRON = 0xFFD9780F;
     private static final int INK = 0xFF1D1A16;
@@ -168,6 +169,14 @@ public class MainActivity extends Activity {
         Button keyBtn = small("Kalit");
         keyBtn.setOnClickListener(v -> showSetup());
         head.addView(keyBtn);
+        final Button pro = small(sp.getBoolean("pro", false) ? "Kuchli: ha" : "Kuchli: yo\u2018q");
+        pro.setOnClickListener(v -> {
+            boolean on = !sp.getBoolean("pro", false);
+            sp.edit().putBoolean("pro", on).apply();
+            pro.setText(on ? "Kuchli: ha" : "Kuchli: yo\u2018q");
+            Toast.makeText(this, on ? "Eng kuchli model yoqildi (sekinroq, limiti kamroq)" : "Tez model yoqildi", Toast.LENGTH_SHORT).show();
+        });
+        head.addView(pro);
         root.addView(head);
 
         scroll = new ScrollView(this);
@@ -427,7 +436,7 @@ public class MainActivity extends Activity {
             boolean ok = true;
             try {
                 JSONArray contents = new JSONArray();
-                int from = Math.max(0, n - 1 - 12);
+                int from = Math.max(0, n - 1 - 30);
                 for (int i = from; i < n - 1; i++) {
                     String[] m = hist.get(i);
                     contents.put(new JSONObject().put("role", m[0].equals("user") ? "user" : "model")
@@ -448,8 +457,9 @@ public class MainActivity extends Activity {
                         .put("system_instruction", new JSONObject()
                                 .put("parts", new JSONArray().put(new JSONObject().put("text", SYSTEM))))
                         .put("contents", contents);
+                body.put("tools", new JSONArray().put(new JSONObject().put("google_search", new JSONObject())));
 
-                URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent");
+                URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/" + (sp.getBoolean("pro", false) ? PRO : MODEL) + ":generateContent");
                 HttpURLConnection c = (HttpURLConnection) url.openConnection();
                 c.setRequestMethod("POST");
                 c.setConnectTimeout(20000);
