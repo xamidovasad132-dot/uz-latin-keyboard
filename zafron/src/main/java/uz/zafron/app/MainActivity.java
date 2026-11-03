@@ -49,7 +49,7 @@ public class MainActivity extends Activity {
     private static final int BG = 0xFFF6F3EE;
 
     private static final String SYSTEM =
-            "Sen Zafron — har qanday mavzuda yordam beradigan aqlli yordamchisan (ta’lim, fan, tarix, til, "
+            "Sen Zafaron — har qanday mavzuda yordam beradigan aqlli yordamchisan (ta’lim, fan, tarix, til, "
             + "matematika, dasturlash, sog‘liq haqida umumiy ma’lumot, biznes, hayotiy maslahatlar, tarjima, yozish) "
             + "va ayniqsa telemasterlik (telefon va televizor ta’miri) bo‘yicha tajribali ustozsan. "
             + "Har qanday savolga to‘liq, aniq javob ber; bilmasang, bilmasligingni ayt. Boshqa tilda yozishsa, shu tilda javob ber. "
@@ -98,7 +98,7 @@ public class MainActivity extends Activity {
         l.setPadding(dp(20), dp(48), dp(20), dp(20));
 
         TextView t = new TextView(this);
-        t.setText("Zafron");
+        t.setText("Zafaron");
         t.setTextSize(32);
         t.setTypeface(null, Typeface.BOLD);
         t.setTextColor(SAFFRON);
@@ -108,7 +108,7 @@ public class MainActivity extends Activity {
         info.setTextSize(16);
         info.setTextColor(INK);
         info.setPadding(0, dp(12), 0, dp(12));
-        info.setText("Zafron ishlashi uchun bepul Google kaliti kerak. Bir marta qilasiz:\n\n"
+        info.setText("Zafaron ishlashi uchun bepul Google kaliti kerak. Bir marta qilasiz:\n\n"
                 + "1) «Kalit olish» tugmasini bosing va Google hisobingiz bilan kiring.\n"
                 + "2) «Create API key» tugmasini bosing.\n"
                 + "3) Chiqqan kalitni nusxalab (copy), pastdagi maydonga qo‘ying.");
@@ -152,7 +152,7 @@ public class MainActivity extends Activity {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setPadding(dp(16), dp(36), dp(8), dp(8));
         TextView title = new TextView(this);
-        title.setText("Zafron");
+        title.setText("Zafaron");
         title.setTextSize(24);
         title.setTypeface(null, Typeface.BOLD);
         title.setTextColor(SAFFRON);
@@ -225,7 +225,7 @@ public class MainActivity extends Activity {
 
     private void drawAll() {
         chat.removeAllViews();
-        bubble("Salom! Men Zafronman. Hamma narsadan so‘rang, telefon va televizor ta’miri bo‘yicha o‘rgataman. "
+        bubble("Salom! Men Zafaronman, sun\u2019iy intellektman. Hamma narsadan so‘rang, telefon va televizor ta’miri bo‘yicha o‘rgataman. "
                 + "Rasm, video yoki matnli fayl yuborish uchun + tugmasini bosing.", false);
         for (String[] m : hist) bubble(m[1], m[0].equals("user"));
         drawAtt();
