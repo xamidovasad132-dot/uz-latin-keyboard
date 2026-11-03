@@ -27,5 +27,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk klaviatura.apk
+          cp zafron/build/outputs/apk/debug/zafron-debug.apk zafron.apk
           gh release delete v1 --yes --cleanup-tag || true
-          gh release create v1 klaviatura.apk --title "Klaviatura APK" --notes "O'zbek lotin klaviaturasi (ş ç ö ğ)"
+          gh release create v1 klaviatura.apk zafron.apk --title "Klaviatura APK" --notes "O'zbek lotin klaviaturasi (ş ç ö ğ)"
