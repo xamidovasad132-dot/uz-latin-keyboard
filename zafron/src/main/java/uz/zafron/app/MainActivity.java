@@ -90,6 +90,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         sp = getSharedPreferences("z", MODE_PRIVATE);
         loadHist();
+        if (android.os.Build.VERSION.SDK_INT >= 33) requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 5);
         if (sp.getString("key", "").isEmpty()) showSetup();
         else showChat();
     }
@@ -246,7 +247,7 @@ public class MainActivity extends Activity {
         TextView info = new TextView(this);
         info.setTextColor(INK);
         info.setPadding(0, dp(6), 0, dp(6));
-        info.setText("Telegram, Instagram va pochtaga kelgan xabarlarni o\u2018qiyman. Buning uchun \u00abRuxsat berish\u00bb ni bosib, Zafaron ni yoqing.");
+        info.setText("Telegram, Instagram, SMS va pochtaga kelgan har bir xabarni o\u2018zbekcha qilib o\u2018zim aytib turaman: telefon bildirishnomasida chiqadi. Buning uchun \u00abRuxsat berish\u00bb ni bosib, Zafaron ni yoqing.");
         l.addView(info);
 
         Button perm = new Button(this);
