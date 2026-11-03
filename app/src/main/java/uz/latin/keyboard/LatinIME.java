@@ -33,6 +33,9 @@ import java.util.Map;
 
 public class LatinIME extends InputMethodService {
 
+    /** Sozlamalar ekrani "tozalash" bosilganda shuni oshiradi. */
+    static volatile int clearGen = 0;
+
     private static final String SHIFT = "SHIFT";
     private static final String DEL = "DEL";
     private static final String P_A = "P_A";
@@ -49,6 +52,11 @@ public class LatinIME extends InputMethodService {
     private static final int NUMPAD = 3;
     private static final int EMOJI_PAGE = 4;
     private static final int LANG_PAGE = 5;
+
+    // Yodlash chegaralari
+    private static final int WORD_TOP = 2;      // so'z 2 marta yozilsa, birinchi bo'lib chiqadi
+    private static final int PAIR_MIN = 2;      // juftlik 2 marta yozilsa, keyingi so'z chiqadi
+    private static final int PHRASE_MIN = 3;    // jumla 3 marta yozilsa, to'liq chiqadi
 
     private static final String[] NUMBERS = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
     private static final String[] BOTTOM = {P_A, NUM, ",", SPACE, ".", ENTER};
@@ -97,12 +105,47 @@ public class LatinIME extends InputMethodService {
             {ABC, "0", ".", ENTER}
     };
 
-    private static final int[] EMOJI = {
-            0x1F600, 0x1F602, 0x1F60D, 0x1F60A, 0x1F618, 0x1F609, 0x1F604, 0x1F606,
-            0x1F60E, 0x1F622, 0x1F62D, 0x1F621, 0x1F914, 0x1F62E, 0x1F634, 0x1F60B,
-            0x1F44D, 0x1F44F, 0x1F64F, 0x1F4AA, 0x1F44B, 0x1F44C, 0x1F64C, 0x1F91D,
-            0x1F525, 0x1F389, 0x1F381, 0x1F339, 0x1F31F, 0x1F495, 0x1F4AF, 0x1F680
-    };
+    private static final String[] EMOJI_ALL;
+    private static final String[] EMOJI_DEFAULT;
+
+    static {
+        int[] cps = {
+                0x1F600, 0x1F603, 0x1F604, 0x1F601, 0x1F606, 0x1F605, 0x1F602, 0x1F923,
+                0x1F60A, 0x1F607, 0x1F642, 0x1F609, 0x1F60D, 0x1F618, 0x1F617, 0x1F60B,
+                0x1F61B, 0x1F61C, 0x1F914, 0x1F610, 0x1F611, 0x1F644, 0x1F60F, 0x1F623,
+                0x1F625, 0x1F62E, 0x1F62A, 0x1F634, 0x1F60C, 0x1F61F, 0x1F641, 0x1F622,
+                0x1F62D, 0x1F631, 0x1F616, 0x1F629, 0x1F624, 0x1F621, 0x1F620, 0x1F608,
+                0x1F480, 0x1F4A9, 0x1F921, 0x1F47B, 0x1F47D, 0x1F916, 0x1F648, 0x1F649,
+                0x1F44D, 0x1F44E, 0x1F44C, 0x1F91E, 0x1F91D, 0x1F44F, 0x1F64C, 0x1F64F,
+                0x1F4AA, 0x1F44B, 0x1F448, 0x1F449, 0x1F446, 0x1F447, 0x1F440, 0x1F9E1,
+                0x1F49B, 0x1F49A, 0x1F499, 0x1F49C, 0x1F5A4, 0x1F494, 0x1F495, 0x1F496,
+                0x1F4AF, 0x1F525, 0x1F389, 0x1F381, 0x1F382, 0x1F31F, 0x1F308, 0x1F319,
+                0x1F680, 0x1F697, 0x1F3E0, 0x1F4F1, 0x1F4BB, 0x1F4DA, 0x1F3B5, 0x1F355,
+                0x1F354, 0x1F37A, 0x1F375, 0x1F3C6, 0x1F3AF, 0x1F4A1, 0x1F4B0, 0x1F339
+        };
+        List<String> l = new ArrayList<>();
+        for (int cp : cps) l.add(new String(Character.toChars(cp)));
+        Collections.addAll(l, "❤️", "✅", "❌", "⭐", "✨",
+                "✌️", "☀️", "⚡");
+        EMOJI_ALL = l.toArray(new String[0]);
+        EMOJI_DEFAULT = new String[]{
+                new String(Character.toChars(0x1F602)), "❤️",
+                new String(Character.toChars(0x1F44D)), new String(Character.toChars(0x1F60D)),
+                new String(Character.toChars(0x1F64F)), new String(Character.toChars(0x1F525)),
+                new String(Character.toChars(0x1F389)), new String(Character.toChars(0x1F60A))
+        };
+    }
+
+    /** Taklif: ko'rinadigan matn va uni qo'yishdan oldin o'chiriladigan belgilar soni. */
+    private static final class Sug {
+        final String text;
+        final int del;
+
+        Sug(String text, int del) {
+            this.text = text;
+            this.del = del;
+        }
+    }
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable repeat;
@@ -114,15 +157,17 @@ public class LatinIME extends InputMethodService {
     private boolean suggestOn = true;
     private int page = LETTERS_PAGE;
     private int keyH;
-    private int learnedSinceSave = 0;
+    private int seenGen = 0;
+    private int unsaved = 0;
     private final Map<String, List<String>> dicts = new HashMap<>();
-    private final Map<String, Map<String, Integer>> learned = new HashMap<>();
+    private final Map<String, Map<String, Integer>> stores = new HashMap<>();
 
     @Override
     public void onCreate() {
         super.onCreate();
         prefs = getSharedPreferences("kb", MODE_PRIVATE);
         lang = Lang.byId(prefs.getString("lang", "uz"));
+        seenGen = clearGen;
     }
 
     @Override
@@ -159,7 +204,7 @@ public class LatinIME extends InputMethodService {
     @Override
     public void onFinishInputView(boolean finishingInput) {
         super.onFinishInputView(finishingInput);
-        saveLearned();
+        saveAll();
     }
 
     @Override
@@ -189,6 +234,8 @@ public class LatinIME extends InputMethodService {
             buildNumpad();
         } else if (page == LANG_PAGE) {
             buildLangPage();
+        } else if (page == EMOJI_PAGE) {
+            buildEmojiPage();
         } else {
             String[][] rows = rowsForPage();
             for (int i = 0; i < rows.length; i++) {
@@ -202,7 +249,6 @@ public class LatinIME extends InputMethodService {
     private String[][] rowsForPage() {
         if (page == SYM_A) return PAGE_A;
         if (page == SYM_B) return PAGE_B;
-        if (page == EMOJI_PAGE) return emojiRows();
         if (lang.kind == Lang.UZ_LATIN) return LETTERS;
         if (lang.kind == Lang.UZ_CYR) return CYRILLIC;
         String[] c3 = chars(lang.r3);
@@ -211,18 +257,6 @@ public class LatinIME extends InputMethodService {
         System.arraycopy(c3, 0, row3, 1, c3.length);
         row3[row3.length - 1] = DEL;
         return new String[][]{NUMBERS, chars(lang.r1), chars(lang.r2), row3, BOTTOM};
-    }
-
-    private String[][] emojiRows() {
-        String[][] r = new String[5][];
-        for (int i = 0; i < 4; i++) {
-            r[i] = new String[8];
-            for (int j = 0; j < 8; j++) {
-                r[i][j] = new String(Character.toChars(EMOJI[i * 8 + j]));
-            }
-        }
-        r[4] = new String[]{ABC, SPACE, DEL};
-        return r;
     }
 
     private static String[] chars(String s) {
@@ -256,13 +290,52 @@ public class LatinIME extends InputMethodService {
     }
 
     // ------------------------------------------------------------------
+    // Smaylik sahifasi: eng ko'p ishlatilganlar + hammasi
+    // ------------------------------------------------------------------
+
+    private String[] recentEmoji(int n) {
+        List<Map.Entry<String, Integer>> es = new ArrayList<>(store("emoji").entrySet());
+        Collections.sort(es, (x, y) -> y.getValue() - x.getValue());
+        List<String> r = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : es) {
+            if (r.size() >= n) break;
+            r.add(e.getKey());
+        }
+        for (String d : EMOJI_DEFAULT) {
+            if (r.size() >= n) break;
+            if (!r.contains(d)) r.add(d);
+        }
+        return r.toArray(new String[0]);
+    }
+
+    private void buildEmojiPage() {
+        root.addView(row(recentEmoji(8)));
+        ScrollView sv = new ScrollView(this);
+        sv.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(204)));
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        for (int i = 0; i < EMOJI_ALL.length; i += 8) {
+            int n = Math.min(8, EMOJI_ALL.length - i);
+            String[] ks = new String[n];
+            System.arraycopy(EMOJI_ALL, i, ks, 0, n);
+            LinearLayout r = (LinearLayout) row(ks);
+            if (n < 8) r.addView(spacer(8 - n));
+            col.addView(r);
+        }
+        sv.addView(col);
+        root.addView(sv);
+        root.addView(row(new String[]{ABC, SPACE, DEL}));
+    }
+
+    // ------------------------------------------------------------------
     // Tepadagi qator: til tugmalari yoki so'z takliflari
     // ------------------------------------------------------------------
 
     private void refreshTop() {
         if (topHolder == null) return;
         topHolder.removeAllViews();
-        List<String> sg = computeSuggestions();
+        List<Sug> sg = computeSuggestions();
         topHolder.addView(sg.isEmpty() ? toolbar() : suggestionBar(sg));
     }
 
@@ -295,14 +368,14 @@ public class LatinIME extends InputMethodService {
         return bar;
     }
 
-    private View suggestionBar(List<String> sg) {
+    private View suggestionBar(List<Sug> sg) {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
         for (int i = 0; i < 3; i++) {
-            final String s = i < sg.size() ? sg.get(i) : "";
+            final Sug s = i < sg.size() ? sg.get(i) : null;
             TextView t = new TextView(this);
             t.setGravity(Gravity.CENTER);
             t.setSingleLine(true);
@@ -311,9 +384,9 @@ public class LatinIME extends InputMethodService {
             t.setTextColor(0xFFFFFFFF);
             t.setTypeface(null, i == 0 ? Typeface.BOLD : Typeface.NORMAL);
             t.setPadding(dp(6), 0, dp(6), 0);
-            t.setText(s);
+            t.setText(s == null ? "" : s.text);
             t.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
-            if (!s.isEmpty()) {
+            if (s != null) {
                 t.setClickable(true);
                 t.setOnClickListener(v -> applySuggestion(s));
             }
@@ -321,8 +394,7 @@ public class LatinIME extends InputMethodService {
             if (i < 2) {
                 View d = new View(this);
                 d.setBackgroundColor(0xFF3A3A3C);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(1), dp(24));
-                bar.addView(d, lp);
+                bar.addView(d, new LinearLayout.LayoutParams(dp(1), dp(24)));
             }
         }
         return bar;
@@ -662,6 +734,7 @@ public class LatinIME extends InputMethodService {
                 return;
             case ENTER:
                 learnCurrent();
+                learnSentence();
                 enter();
                 refreshTop();
                 return;
@@ -670,12 +743,17 @@ public class LatinIME extends InputMethodService {
                 return;
             default:
                 boolean wasCaps = caps && page == LETTERS_PAGE;
-                if (isSeparator(k)) learnCurrent();
+                if (page == EMOJI_PAGE) {
+                    countEmoji(k);
+                } else if (isSeparator(k)) {
+                    learnCurrent();
+                    if (k.equals(".") || k.equals("!") || k.equals("?")) learnSentence();
+                }
                 commit(wasCaps ? upper(k) : k);
                 if (wasCaps) {
                     caps = false;
                     build();
-                } else {
+                } else if (page == LETTERS_PAGE) {
                     refreshTop();
                 }
         }
@@ -695,7 +773,7 @@ public class LatinIME extends InputMethodService {
         } else {
             ic.deleteSurroundingText(1, 0);
         }
-        refreshTop();
+        if (page == LETTERS_PAGE) refreshTop();
     }
 
     private void enter() {
@@ -713,6 +791,128 @@ public class LatinIME extends InputMethodService {
     }
 
     // ------------------------------------------------------------------
+    // Xotira: so'zlar, juftliklar, jumlalar, smaylikalar
+    // ------------------------------------------------------------------
+
+    private void checkClear() {
+        if (seenGen != clearGen) {
+            stores.clear();
+            seenGen = clearGen;
+            unsaved = 0;
+        }
+    }
+
+    private Map<String, Integer> store(String key) {
+        checkClear();
+        Map<String, Integer> m = stores.get(key);
+        if (m == null) {
+            m = new HashMap<>();
+            String s = prefs.getString(key, "");
+            for (String line : s.split("\n")) {
+                int t = line.lastIndexOf('\t');
+                if (t > 0) {
+                    try {
+                        m.put(line.substring(0, t), Integer.parseInt(line.substring(t + 1).trim()));
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            }
+            stores.put(key, m);
+        }
+        return m;
+    }
+
+    private void inc(Map<String, Integer> m, String k, int max) {
+        Integer c = m.get(k);
+        m.put(k, c == null ? 1 : c + 1);
+        if (m.size() > max) {
+            List<String> drop = new ArrayList<>();
+            for (Map.Entry<String, Integer> e : m.entrySet()) if (e.getValue() <= 1) drop.add(e.getKey());
+            for (String d : drop) m.remove(d);
+        }
+        unsaved++;
+        if (unsaved >= 6) saveAll();
+    }
+
+    private void saveAll() {
+        checkClear();
+        if (prefs == null || stores.isEmpty()) return;
+        SharedPreferences.Editor ed = prefs.edit();
+        for (Map.Entry<String, Map<String, Integer>> e : stores.entrySet()) {
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<String, Integer> w : e.getValue().entrySet()) {
+                sb.append(w.getKey()).append('\t').append(w.getValue()).append('\n');
+            }
+            ed.putString(e.getKey(), sb.toString());
+        }
+        ed.apply();
+        unsaved = 0;
+    }
+
+    private String clean(String s) {
+        return s.replace('\t', ' ').replace('\n', ' ');
+    }
+
+    private String norm(String w) {
+        w = w.toLowerCase(lang.loc);
+        while (w.length() > 0 && (w.charAt(0) == '\'' || w.charAt(0) == '’')) w = w.substring(1);
+        while (w.length() > 0 && (w.charAt(w.length() - 1) == '\'' || w.charAt(w.length() - 1) == '’')) {
+            w = w.substring(0, w.length() - 1);
+        }
+        return w;
+    }
+
+    private void countEmoji(String e) {
+        inc(store("emoji"), e, 300);
+    }
+
+    private void learn(String w) {
+        if (!suggestOn) return;
+        w = norm(w);
+        if (w.length() < 2 || w.length() > 24) return;
+        inc(store("w_" + lang.id), w, 3000);
+    }
+
+    private void learnPair(String prev, String next) {
+        prev = norm(prev);
+        next = norm(next);
+        if (prev.isEmpty() || next.isEmpty() || prev.length() > 24 || next.length() > 24) return;
+        inc(store("b_" + lang.id), prev + "\t" + next, 4000);
+    }
+
+    /** Kursor oldidagi so'zni (va oldingi so'z bilan juftligini) yodlaydi. */
+    private void learnCurrent() {
+        if (!suggestOn) return;
+        String b = beforeText(120);
+        int i = b.length();
+        while (i > 0 && isWordChar(b.charAt(i - 1))) i--;
+        String cur = b.substring(i);
+        if (cur.isEmpty()) return;
+        learn(cur);
+        int j = i;
+        while (j > 0 && b.charAt(j - 1) == ' ') j--;
+        if (j < i && j > 0) {
+            int k = j;
+            while (k > 0 && isWordChar(b.charAt(k - 1))) k--;
+            if (k < j) learnPair(b.substring(k, j), cur);
+        }
+    }
+
+    /** Gap tugagach (nuqta, ?, !, Enter) butun jumlani yodlaydi. */
+    private void learnSentence() {
+        if (!suggestOn) return;
+        String b = beforeText(120);
+        int bd = lastBoundary(b);
+        if (bd < 0 && b.length() >= 120) return;
+        String seg = clean(b.substring(bd + 1).trim()).toLowerCase(lang.loc);
+        if (seg.length() < 5 || seg.length() > 70) return;
+        int spaces = 0;
+        for (int i = 0; i < seg.length(); i++) if (seg.charAt(i) == ' ') spaces++;
+        if (spaces < 1 || spaces > 8) return;
+        inc(store("p_" + lang.id), seg, 1500);
+    }
+
+    // ------------------------------------------------------------------
     // So'z takliflari
     // ------------------------------------------------------------------
 
@@ -726,18 +926,25 @@ public class LatinIME extends InputMethodService {
         return !Character.isLetterOrDigit(c) && c != '’' && c != '\'';
     }
 
-    private String beforeText() {
-        InputConnection ic = getCurrentInputConnection();
-        if (ic == null) return "";
-        CharSequence cs = ic.getTextBeforeCursor(40, 0);
-        return cs == null ? "" : cs.toString();
+    private int lastBoundary(String b) {
+        for (int i = b.length() - 1; i >= 0; i--) {
+            char c = b.charAt(i);
+            if (c == '.' || c == '!' || c == '?' || c == '\n') return i;
+        }
+        return -1;
     }
 
-    private String curWord() {
-        String b = beforeText();
-        int i = b.length();
-        while (i > 0 && isWordChar(b.charAt(i - 1))) i--;
-        return b.substring(i);
+    private String ltrim(String s) {
+        int i = 0;
+        while (i < s.length() && Character.isWhitespace(s.charAt(i))) i++;
+        return s.substring(i);
+    }
+
+    private String beforeText(int n) {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return "";
+        CharSequence cs = ic.getTextBeforeCursor(n, 0);
+        return cs == null ? "" : cs.toString();
     }
 
     private List<String> dict(Lang l) {
@@ -756,126 +963,115 @@ public class LatinIME extends InputMethodService {
         return s.substring(0, n).toUpperCase(lang.loc) + s.substring(n);
     }
 
-    private List<String> computeSuggestions() {
-        List<String> out = new ArrayList<>();
+    private void addSug(List<Sug> out, String t, int del) {
+        if (out.size() >= 3 || t.isEmpty()) return;
+        for (Sug s : out) if (s.text.equalsIgnoreCase(t)) return;
+        out.add(new Sug(t, del));
+    }
+
+    private List<Sug> computeSuggestions() {
+        List<Sug> out = new ArrayList<>();
         if (!suggestOn || page != LETTERS_PAGE) return out;
-        String b = beforeText();
+        String b = beforeText(120);
+        int bd = lastBoundary(b);
+        boolean truncated = bd < 0 && b.length() >= 120;
         int i = b.length();
         while (i > 0 && isWordChar(b.charAt(i - 1))) i--;
         String cur = b.substring(i);
-        List<String> dict = dict(lang);
+        String segT = ltrim(b.substring(bd + 1));
+        String lowSeg = segT.toLowerCase(lang.loc);
 
-        if (cur.isEmpty()) {
-            if (!b.endsWith(" ")) return out;
-            int j = b.length();
-            while (j > 0 && b.charAt(j - 1) == ' ') j--;
+        String prev = "";
+        int j = i;
+        while (j > 0 && b.charAt(j - 1) == ' ') j--;
+        if (j < i && j > 0) {
             int k = j;
             while (k > 0 && isWordChar(b.charAt(k - 1))) k--;
-            if (k >= j) return out;
-            String key = b.substring(k, j).toLowerCase(lang.loc) + " ";
-            for (String p : dict) {
-                if (p.startsWith(key) && p.length() > key.length()) {
-                    String rest = p.substring(key.length());
-                    if (!out.contains(rest)) out.add(rest);
-                    if (out.size() >= 3) break;
+            if (k < j) prev = norm(b.substring(k, j));
+        }
+
+        // 1. Ko'p yozilgan jumlalar: boshini yozsangiz, to'liq chiqadi
+        if (!truncated && lowSeg.length() >= 1 && lowSeg.length() <= 60) {
+            List<Map.Entry<String, Integer>> ps = new ArrayList<>();
+            for (Map.Entry<String, Integer> e : store("p_" + lang.id).entrySet()) {
+                String k = e.getKey();
+                if (e.getValue() >= PHRASE_MIN && k.length() > lowSeg.length() && k.startsWith(lowSeg)) {
+                    ps.add(e);
                 }
+            }
+            Collections.sort(ps, (x, y) -> y.getValue() - x.getValue());
+            boolean cap = !segT.isEmpty() && Character.isUpperCase(segT.codePointAt(0));
+            for (Map.Entry<String, Integer> e : ps) {
+                if (out.size() >= 2) break;
+                addSug(out, cap ? capFirst(e.getKey()) : e.getKey(), segT.length());
+            }
+        }
+
+        Map<String, Integer> pairs = store("b_" + lang.id);
+        List<String> dict = dict(lang);
+
+        // 2. Bo'sh joydan keyin: keyingi so'z
+        if (cur.isEmpty()) {
+            if (prev.isEmpty()) return out;
+            String key = prev + "\t";
+            List<Map.Entry<String, Integer>> bs = new ArrayList<>();
+            for (Map.Entry<String, Integer> e : pairs.entrySet()) {
+                if (e.getValue() >= PAIR_MIN && e.getKey().startsWith(key)) bs.add(e);
+            }
+            Collections.sort(bs, (x, y) -> y.getValue() - x.getValue());
+            for (Map.Entry<String, Integer> e : bs) addSug(out, e.getKey().substring(key.length()), 0);
+            String pk = prev + " ";
+            for (String p : dict) {
+                if (p.startsWith(pk) && p.length() > pk.length()) addSug(out, p.substring(pk.length()), 0);
             }
             return out;
         }
 
+        // 3. So'z boshlangan: harflarga mos so'zlar
         String low = cur.toLowerCase(lang.loc);
         boolean cap = Character.isUpperCase(cur.codePointAt(0));
+        List<String> res = new ArrayList<>();
+
+        if (!prev.isEmpty()) {
+            String pk = prev + "\t" + low;
+            List<Map.Entry<String, Integer>> bs = new ArrayList<>();
+            for (Map.Entry<String, Integer> e : pairs.entrySet()) {
+                if (e.getValue() >= PAIR_MIN && e.getKey().startsWith(pk)) bs.add(e);
+            }
+            Collections.sort(bs, (x, y) -> y.getValue() - x.getValue());
+            for (Map.Entry<String, Integer> e : bs) {
+                String w = e.getKey().substring(prev.length() + 1);
+                if (!w.equals(low) && !res.contains(w)) res.add(w);
+            }
+        }
+
         List<Map.Entry<String, Integer>> es = new ArrayList<>();
-        for (Map.Entry<String, Integer> e : learnedMap(lang).entrySet()) {
+        for (Map.Entry<String, Integer> e : store("w_" + lang.id).entrySet()) {
             if (e.getKey().startsWith(low) && !e.getKey().equals(low)) es.add(e);
         }
         Collections.sort(es, (x, y) -> y.getValue() - x.getValue());
-
-        List<String> res = new ArrayList<>();
         for (Map.Entry<String, Integer> e : es) {
-            if (e.getValue() >= 3 && res.size() < 3) res.add(e.getKey());
+            if (e.getValue() >= WORD_TOP && !res.contains(e.getKey())) res.add(e.getKey());
         }
         for (String p : dict) {
-            if (res.size() >= 3) break;
             if (p.startsWith(low) && !p.equals(low) && !res.contains(p)) res.add(p);
         }
         for (Map.Entry<String, Integer> e : es) {
-            if (res.size() >= 3) break;
             if (!res.contains(e.getKey())) res.add(e.getKey());
         }
-        for (String r : res) out.add(cap ? capFirst(r) : r);
+        for (String r : res) addSug(out, cap ? capFirst(r) : r, cur.length());
         return out;
     }
 
-    private void applySuggestion(String s) {
+    private void applySuggestion(Sug s) {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
-        int n = curWord().length();
         ic.beginBatchEdit();
-        if (n > 0) ic.deleteSurroundingText(n, 0);
-        ic.commitText(s + " ", 1);
+        if (s.del > 0) ic.deleteSurroundingText(s.del, 0);
+        ic.commitText(s.text + " ", 1);
         ic.endBatchEdit();
-        for (String w : s.split(" ")) learn(w);
+        for (String w : s.text.split(" ")) learn(w);
         refreshTop();
-    }
-
-    private Map<String, Integer> learnedMap(Lang l) {
-        Map<String, Integer> m = learned.get(l.id);
-        if (m == null) {
-            m = new HashMap<>();
-            String s = prefs.getString("w_" + l.id, "");
-            for (String line : s.split("\n")) {
-                int t = line.indexOf('\t');
-                if (t > 0) {
-                    try {
-                        m.put(line.substring(0, t), Integer.parseInt(line.substring(t + 1).trim()));
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
-            }
-            learned.put(l.id, m);
-        }
-        return m;
-    }
-
-    private void learnCurrent() {
-        if (!suggestOn) return;
-        String w = curWord();
-        if (!w.isEmpty()) learn(w);
-    }
-
-    private void learn(String w) {
-        if (!suggestOn) return;
-        w = w.toLowerCase(lang.loc);
-        while (w.length() > 0 && (w.charAt(0) == '\'' || w.charAt(0) == '’')) w = w.substring(1);
-        while (w.length() > 0 && (w.charAt(w.length() - 1) == '\'' || w.charAt(w.length() - 1) == '’')) {
-            w = w.substring(0, w.length() - 1);
-        }
-        if (w.length() < 2 || w.length() > 24) return;
-        Map<String, Integer> m = learnedMap(lang);
-        Integer c = m.get(w);
-        m.put(w, c == null ? 1 : c + 1);
-        if (m.size() > 3000) {
-            List<String> drop = new ArrayList<>();
-            for (Map.Entry<String, Integer> e : m.entrySet()) if (e.getValue() <= 1) drop.add(e.getKey());
-            for (String d : drop) m.remove(d);
-        }
-        learnedSinceSave++;
-        if (learnedSinceSave >= 8) saveLearned();
-    }
-
-    private void saveLearned() {
-        if (prefs == null || learned.isEmpty()) return;
-        SharedPreferences.Editor ed = prefs.edit();
-        for (Map.Entry<String, Map<String, Integer>> e : learned.entrySet()) {
-            StringBuilder sb = new StringBuilder();
-            for (Map.Entry<String, Integer> w : e.getValue().entrySet()) {
-                sb.append(w.getKey()).append('\t').append(w.getValue()).append('\n');
-            }
-            ed.putString("w_" + e.getKey(), sb.toString());
-        }
-        ed.apply();
-        learnedSinceSave = 0;
     }
 
     private int dp(float v) {
