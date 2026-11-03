@@ -12,6 +12,10 @@ import android.graphics.drawable.GradientDrawable;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 import android.text.InputType;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
@@ -169,6 +173,9 @@ public class MainActivity extends Activity {
         Button keyBtn = small("Kalit");
         keyBtn.setOnClickListener(v -> showSetup());
         head.addView(keyBtn);
+        Button inbox = small("Xabarlar");
+        inbox.setOnClickListener(v -> showInbox());
+        head.addView(inbox);
         final Button pro = small(sp.getBoolean("pro", false) ? "Kuchli: ha" : "Kuchli: yo\u2018q");
         pro.setOnClickListener(v -> {
             boolean on = !sp.getBoolean("pro", false);
@@ -221,6 +228,90 @@ public class MainActivity extends Activity {
 
         setContentView(root);
         drawAll();
+    }
+
+    private void showInbox() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
+        l.setBackgroundColor(BG);
+        l.setPadding(dp(16), dp(40), dp(16), dp(12));
+
+        TextView t = new TextView(this);
+        t.setText("Xabarlar");
+        t.setTextSize(26);
+        t.setTypeface(null, Typeface.BOLD);
+        t.setTextColor(SAFFRON);
+        l.addView(t);
+
+        TextView info = new TextView(this);
+        info.setTextColor(INK);
+        info.setPadding(0, dp(6), 0, dp(6));
+        info.setText("Telegram, Instagram va pochtaga kelgan xabarlarni o\u2018qiyman. Buning uchun \u00abRuxsat berish\u00bb ni bosib, Zafaron ni yoqing.");
+        l.addView(info);
+
+        Button perm = new Button(this);
+        perm.setText("Ruxsat berish");
+        perm.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+        l.addView(perm);
+
+        final Button speak = new Button(this);
+        speak.setText(sp.getBoolean("speak", false) ? "Ovozda aytish: ha" : "Ovozda aytish: yo\u2018q");
+        speak.setOnClickListener(v -> {
+            boolean on = !sp.getBoolean("speak", false);
+            sp.edit().putBoolean("speak", on).apply();
+            speak.setText(on ? "Ovozda aytish: ha" : "Ovozda aytish: yo\u2018q");
+        });
+        l.addView(speak);
+
+        final StringBuilder all = new StringBuilder();
+        StringBuilder shown = new StringBuilder();
+        try {
+            JSONArray a = new JSONArray(sp.getString("inbox", "[]"));
+            SimpleDateFormat f = new SimpleDateFormat("dd.MM HH:mm", Locale.US);
+            for (int i = a.length() - 1; i >= 0 && i >= a.length() - 40; i--) {
+                JSONObject o = a.getJSONObject(i);
+                String line = o.getString("a") + " \u2022 " + o.getString("t") + ": " + o.getString("x");
+                shown.append(f.format(new Date(o.getLong("ts")))).append("  ").append(line).append("\n\n");
+                all.insert(0, line + "\n");
+            }
+        } catch (Exception ignored) {
+        }
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        Button ask = new Button(this);
+        ask.setText("Zafaronga ko\u2018rsatish");
+        ask.setOnClickListener(v -> {
+            if (all.length() == 0) {
+                Toast.makeText(this, "Hozircha xabar yo\u2018q", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            showChat();
+            inp.setText("Menga kelgan xabarlar. Muhimlarini ayt, kim nima so\u2018raganini qisqa yoz va javob taklif qil:\n\n" + all);
+            send();
+        });
+        row.addView(ask, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        Button clr = new Button(this);
+        clr.setText("Tozalash");
+        clr.setOnClickListener(v -> {
+            sp.edit().remove("inbox").apply();
+            showInbox();
+        });
+        row.addView(clr);
+        Button back = new Button(this);
+        back.setText("Orqaga");
+        back.setOnClickListener(v -> showChat());
+        row.addView(back);
+        l.addView(row);
+
+        ScrollView sv = new ScrollView(this);
+        TextView list = new TextView(this);
+        list.setTextColor(INK);
+        list.setTextIsSelectable(true);
+        list.setText(shown.length() == 0 ? "Hozircha xabar yo\u2018q." : shown.toString());
+        sv.addView(list);
+        l.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        setContentView(l);
     }
 
     private Button small(String s) {
