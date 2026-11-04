@@ -176,16 +176,13 @@ public class MainActivity extends Activity {
             drawAll();
         });
         head.addView(neu);
-        Button keyBtn = small("Kalit");
-        keyBtn.setOnClickListener(v -> showSetup());
-        head.addView(keyBtn);
         Button inbox = small("Xabarlar");
         inbox.setOnClickListener(v -> showInbox());
         head.addView(inbox);
-        final Button pro = small(sp.getBoolean("pro", false) ? "Kuchli: ha" : "Kuchli: yo\u2018q");
+        final Button pro = small(sp.getBoolean("pro2", false) ? "Kuchli: ha" : "Kuchli: yo\u2018q");
         pro.setOnClickListener(v -> {
-            boolean on = !sp.getBoolean("pro", false);
-            sp.edit().putBoolean("pro", on).apply();
+            boolean on = !sp.getBoolean("pro2", false);
+            sp.edit().putBoolean("pro2", on).apply();
             pro.setText(on ? "Kuchli: ha" : "Kuchli: yo\u2018q");
             Toast.makeText(this, on ? "Eng kuchli model yoqildi (sekinroq, limiti kamroq)" : "Tez model yoqildi", Toast.LENGTH_SHORT).show();
         });
@@ -252,7 +249,7 @@ public class MainActivity extends Activity {
         TextView info = new TextView(this);
         info.setTextColor(INK);
         info.setPadding(0, dp(6), 0, dp(6));
-        info.setText("Telegram, Instagram, SMS va pochtaga kelgan har bir xabarni o\u2018zbekcha qilib o\u2018zim aytib turaman: telefon bildirishnomasida chiqadi. Buning uchun \u00abRuxsat berish\u00bb ni bosib, Zafaron ni yoqing.");
+        info.setText("Telegram, Instagram, telefon raqamingizga kelgan SMS va Gmail xabarlari o\u2018zbekcha qilib bildirishnomada chiqadi. Hisoblaringizni o\u2018zingiz avvalgidek telefonda kirgan holda qoldirasiz: Telegram, Instagram va Gmail ilovalarida hisobingiz ochiq bo\u2018lsa kifoya. Faqat \u00abRuxsat berish\u00bb ni bosib, Zafaron ni yoqing.");
         l.addView(info);
 
         Button perm = new Button(this);
@@ -268,6 +265,25 @@ public class MainActivity extends Activity {
             speak.setText(on ? "Ovozda aytish: ha" : "Ovozda aytish: yo\u2018q");
         });
         l.addView(speak);
+
+        TextView st = new TextView(this);
+        st.setTextColor(INK);
+        st.setPadding(0, dp(6), 0, dp(6));
+        String en = Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
+        boolean on = en != null && en.contains(getPackageName());
+        StringBuilder ss = new StringBuilder("Ruxsat: " + (on ? "yoqilgan \u2713" : "yoqilmagan \u2717") + "\n");
+        try {
+            JSONArray ia = new JSONArray(sp.getString("inbox", "[]"));
+            String[] srcs = {"Telegram", "Instagram", "SMS", "Pochta"};
+            for (String sname : srcs) {
+                boolean seen = false;
+                for (int k = 0; k < ia.length(); k++) if (ia.getJSONObject(k).getString("a").equals(sname)) seen = true;
+                ss.append(sname).append(": ").append(seen ? "ulangan \u2713" : "hali xabar kelmadi").append("\n");
+            }
+        } catch (Exception ignored) {
+        }
+        st.setText(ss.toString().trim());
+        l.addView(st);
 
         final StringBuilder all = new StringBuilder();
         StringBuilder shown = new StringBuilder();
@@ -304,6 +320,10 @@ public class MainActivity extends Activity {
             showInbox();
         });
         row.addView(clr);
+        Button keyB = new Button(this);
+        keyB.setText("Kalit");
+        keyB.setOnClickListener(v -> showSetup());
+        row.addView(keyB);
         Button back = new Button(this);
         back.setText("Orqaga");
         back.setOnClickListener(v -> showChat());
@@ -556,24 +576,32 @@ public class MainActivity extends Activity {
                         .put("contents", contents);
                 body.put("tools", new JSONArray().put(new JSONObject().put("google_search", new JSONObject())));
 
-                URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/" + (sp.getBoolean("pro", false) ? PRO : MODEL) + ":generateContent");
-                HttpURLConnection c = (HttpURLConnection) url.openConnection();
-                c.setRequestMethod("POST");
-                c.setConnectTimeout(20000);
-                c.setReadTimeout(90000);
-                c.setDoOutput(true);
-                c.setRequestProperty("Content-Type", "application/json");
-                c.setRequestProperty("x-goog-api-key", key);
-                OutputStream os = c.getOutputStream();
-                os.write(body.toString().getBytes("UTF-8"));
-                os.close();
-                int code = c.getResponseCode();
-                InputStream is = code >= 200 && code < 300 ? c.getInputStream() : c.getErrorStream();
-                ByteArrayOutputStream bo = new ByteArrayOutputStream();
-                byte[] buf = new byte[8192];
-                int r;
-                while (is != null && (r = is.read(buf)) > 0) bo.write(buf, 0, r);
-                String resp = bo.toString("UTF-8");
+                String[] models = sp.getBoolean("pro2", false)
+                        ? new String[]{PRO, MODEL, "gemini-flash-lite-latest"}
+                        : new String[]{MODEL, "gemini-flash-lite-latest"};
+                int code = 0;
+                String resp = "";
+                for (String mdl : models) {
+                    URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/" + mdl + ":generateContent");
+                    HttpURLConnection c = (HttpURLConnection) url.openConnection();
+                    c.setRequestMethod("POST");
+                    c.setConnectTimeout(20000);
+                    c.setReadTimeout(90000);
+                    c.setDoOutput(true);
+                    c.setRequestProperty("Content-Type", "application/json");
+                    c.setRequestProperty("x-goog-api-key", key);
+                    OutputStream os = c.getOutputStream();
+                    os.write(body.toString().getBytes("UTF-8"));
+                    os.close();
+                    code = c.getResponseCode();
+                    InputStream is = code >= 200 && code < 300 ? c.getInputStream() : c.getErrorStream();
+                    ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                    byte[] buf = new byte[8192];
+                    int r;
+                    while (is != null && (r = is.read(buf)) > 0) bo.write(buf, 0, r);
+                    resp = bo.toString("UTF-8");
+                    if (code != 429 && code != 503 && code != 404) break;
+                }
                 if (code >= 200 && code < 300) {
                     JSONArray ps = new JSONObject(resp).getJSONArray("candidates").getJSONObject(0)
                             .getJSONObject("content").getJSONArray("parts");
