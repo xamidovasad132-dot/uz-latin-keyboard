@@ -11,7 +11,7 @@ OK tap 'Video yasash'
 OK tap 'Har qatorga'
 OK tap 'Videoni yasash'
 total 2496
--rwxrwx--- 1 u0_a171 media_rw 2551602 2026-11-04 09:27 zafaron_1793784435557.mp4
+-rwxrwx--- 1 u0_a159 media_rw 2551602 2026-11-04 09:36 zafaron_1793785005086.mp4
 OK ekranda bor: Tayyor
 OK tap 'Orqaga'
 OK tap '≡'
