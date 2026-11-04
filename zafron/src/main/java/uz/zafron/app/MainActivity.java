@@ -212,7 +212,7 @@ public class MainActivity extends Activity {
         vid.setOnClickListener(v -> showVideo());
         head2.addView(vid);
         Button connect = small("Ulash");
-        connect.setOnClickListener(v -> showConnect());
+        connect.setOnClickListener(v -> showInbox());
         head2.addView(connect);
         root.addView(head2);
 
@@ -525,7 +525,7 @@ public class MainActivity extends Activity {
         TextView info = new TextView(this);
         info.setTextColor(INK);
         info.setPadding(0, dp(6), 0, dp(6));
-        info.setText("Telegram, Instagram, telefon raqamingizga kelgan SMS va Gmail xabarlari o\u2018zbekcha qilib bildirishnomada chiqadi. Hisoblaringizni o\u2018zingiz avvalgidek telefonda kirgan holda qoldirasiz: Telegram, Instagram va Gmail ilovalarida hisobingiz ochiq bo\u2018lsa kifoya. Faqat \u00abRuxsat berish\u00bb ni bosib, Zafaron ni yoqing.");
+        info.setText("Hech narsa o\u2018zi ulanmaydi. Avval \u00abRuxsat berish\u00bb ni bosib Zafaron ni yoqing, keyin qaysi hisobni o\u2018zingiz xohlasangiz, shuni pastda \u00abulash\u00bb bilan yoqasiz.");
         l.addView(info);
 
         Button perm = new Button(this);
@@ -554,12 +554,31 @@ public class MainActivity extends Activity {
             for (String sname : srcs) {
                 boolean seen = false;
                 for (int k = 0; k < ia.length(); k++) if (ia.getJSONObject(k).getString("a").equals(sname)) seen = true;
-                ss.append(sname).append(": ").append(seen ? "ulangan \u2713" : "hali xabar kelmadi").append("\n");
+                
             }
         } catch (Exception ignored) {
         }
         st.setText(ss.toString().trim());
         l.addView(st);
+        for (final String sname : new String[]{"Telegram", "Instagram", "SMS", "Pochta"}) {
+            final Button tb = new Button(this);
+            tb.setText(sname + (sp.getBoolean("src_" + sname, false) ? ": ulangan \u2713 (o\u2018chirish uchun bosing)" : ": ulash"));
+            tb.setOnClickListener(v -> {
+                sp.edit().putBoolean("src_" + sname, !sp.getBoolean("src_" + sname, false)).apply();
+                showInbox();
+            });
+            l.addView(tb);
+        }
+        Button bat = new Button(this);
+        bat.setText("Orqa fonda ishlashga ruxsat (batareya)");
+        bat.setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())));
+            } catch (Exception e) {
+                startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+            }
+        });
+        l.addView(bat);
 
         final StringBuilder all = new StringBuilder();
         StringBuilder shown = new StringBuilder();

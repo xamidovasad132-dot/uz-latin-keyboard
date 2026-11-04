@@ -105,6 +105,7 @@ public class NotifService extends NotificationListenerService {
         try {
             String app = appName(sbn.getPackageName());
             if (app == null) return;
+            if (!getSharedPreferences("z", Context.MODE_PRIVATE).getBoolean("src_" + app, false)) return;
             Notification n = sbn.getNotification();
             if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) return;
             Bundle e = n.extras;
