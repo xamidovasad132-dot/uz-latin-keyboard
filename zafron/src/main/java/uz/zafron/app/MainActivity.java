@@ -1245,7 +1245,7 @@ public class MainActivity extends Activity {
                     } catch (Exception ignored) {
                     }
                     if (code == 400 && msg.toLowerCase().contains("key")) {
-                        ans = "Kalit noto‘g‘ri. Tepadagi «Kalit» tugmasi bilan yangisini kiriting.";
+                        ans = "Kalit noto‘g‘ri. Yon menyudagi logoni bosing → Sozlamalar → Google kaliti.";
                     } else if (code == 429) {
                         ans = "Zafaron hozir band. Bir ozdan keyin qayta yuboring.";
                     } else {
