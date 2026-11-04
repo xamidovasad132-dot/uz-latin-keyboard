@@ -61,6 +61,7 @@ sleep 30
 shot 05_video_done
 adb shell ls -l /sdcard/Movies/Zafaron 2>&1 | tee -a $S
 mkdir -p $OUT/video; adb pull /sdcard/Movies/Zafaron $OUT/video >/dev/null 2>&1
+adb shell input keyevent 4; sleep 2
 adb shell am start -n $PKG/.MainActivity >/dev/null; sleep 3
 shot 05b_back
 has "Tayyor"
