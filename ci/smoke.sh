@@ -42,6 +42,7 @@ adb shell am start -n $PKG/.MainActivity >/dev/null; sleep 5
 shot 01_setup; has "Kalit olish"
 tap "Kalitni shu"
 adb shell input text "AIzaSyFAKEFAKEFAKEFAKEFAKE1234567890"
+adb shell input keyevent 4; sleep 1
 tap "Saqlash"; sleep 2
 shot 02_chat; has "Salom"; has "Ulash"
 
@@ -55,6 +56,7 @@ adb shell input keyevent 66
 adb shell input text "Zafaron"
 adb shell input keyevent 66
 adb shell input text "Telemasterlik"
+adb shell input keyevent 4; sleep 1
 tap "Videoni yasash"
 sleep 30
 shot 05_video_done
@@ -69,6 +71,7 @@ tap "Orqaga"; sleep 1
 
 tap "Savol yozing"
 adb shell input text "salom"
+adb shell input keyevent 4; sleep 1
 tap "↑"
 sleep 20
 shot 07_reply
