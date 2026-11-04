@@ -36,13 +36,13 @@ has() { dump; if grep -qi "$1" $OUT/u.xml; then log "OK ekranda bor: $1"; else l
 adb install -r zafron-debug.apk >/dev/null 2>&1 && log "OK o'rnatildi" || log "FAIL o'rnatilmadi"
 adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null
 adb shell settings put secure show_ime_with_hard_keyboard 0
+for ime in $(adb shell ime list -s | tr -d "\r"); do adb shell ime disable "$ime" >/dev/null 2>&1; done
 adb logcat -c
 
 adb shell am start -n $PKG/.MainActivity >/dev/null; sleep 5
 shot 01_setup; has "Kalit olish"
 tap "Kalitni shu"
 adb shell input text "AIzaSyFAKEFAKEFAKEFAKEFAKE1234567890"
-adb shell input keyevent 4; sleep 1
 tap "Saqlash"; sleep 2
 shot 02_chat; has "Salom"; has "Ulash"
 
@@ -56,7 +56,6 @@ adb shell input keyevent 66
 adb shell input text "Zafaron"
 adb shell input keyevent 66
 adb shell input text "Telemasterlik"
-adb shell input keyevent 4; sleep 1
 tap "Videoni yasash"
 sleep 30
 shot 05_video_done
@@ -71,7 +70,6 @@ tap "Orqaga"; sleep 1
 
 tap "Savol yozing"
 adb shell input text "salom"
-adb shell input keyevent 4; sleep 1
 tap "↑"
 sleep 20
 shot 07_reply
