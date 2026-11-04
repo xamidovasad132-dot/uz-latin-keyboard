@@ -211,6 +211,9 @@ public class MainActivity extends Activity {
         Button vid = small("Video yasash");
         vid.setOnClickListener(v -> showVideo());
         head2.addView(vid);
+        Button connect = small("Ulash");
+        connect.setOnClickListener(v -> showConnect());
+        head2.addView(connect);
         root.addView(head2);
 
         scroll = new ScrollView(this);
@@ -354,6 +357,31 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             Toast.makeText(this, "Saqlab bo\u2018lmadi", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void showConnect() {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Ulash")
+                .setMessage("Telegram, Instagram, pochta (Gmail) va telefon raqamingizga kelgan SMS xabarlarini o\u2018zbekcha aytib turishim uchun uchta ruxsat kerak:\n\n"
+                        + "1) Bildirishnoma yuborish\n2) Bildirishnomalarni o\u2018qish (Zafaron ni yoqing)\n3) Orqa fonda ishlash (batareya)\n\n"
+                        + "Parolingiz so\u2018ralmaydi. Telegram, Instagram va Gmail ilovalarida hisobingiz ochiq bo\u2018lsa kifoya.")
+                .setPositiveButton("Ruxsat berish", (d, w) -> {
+                    if (android.os.Build.VERSION.SDK_INT >= 33) {
+                        requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 6);
+                    }
+                    startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+                    Toast.makeText(this, "Ro\u2018yxatdan Zafaron ni toping va yoqing", Toast.LENGTH_LONG).show();
+                })
+                .setNeutralButton("Batareya", (d, w) -> {
+                    try {
+                        startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                Uri.parse("package:" + getPackageName())));
+                    } catch (Exception e) {
+                        startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                    }
+                })
+                .setNegativeButton("Bekor", null)
+                .show();
     }
 
     private void showVideo() {
