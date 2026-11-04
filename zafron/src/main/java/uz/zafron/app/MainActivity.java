@@ -12,6 +12,9 @@ import android.graphics.drawable.GradientDrawable;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
+import android.content.ContentValues;
+import android.widget.ImageView;
 import android.provider.Settings;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -176,6 +179,20 @@ public class MainActivity extends Activity {
             drawAll();
         });
         head.addView(neu);
+        Button share = small("Ulashish");
+        share.setOnClickListener(v -> {
+            String last = null;
+            for (int i = hist.size() - 1; i >= 0; i--) if (hist.get(i)[0].equals("model")) { last = hist.get(i)[1]; break; }
+            if (last == null) {
+                Toast.makeText(this, "Hozircha javob yo\u2018q", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Intent it = new Intent(Intent.ACTION_SEND);
+            it.setType("text/plain");
+            it.putExtra(Intent.EXTRA_TEXT, last);
+            startActivity(Intent.createChooser(it, "Ulashish yoki saqlash"));
+        });
+        head.addView(share);
         Button inbox = small("Xabarlar");
         inbox.setOnClickListener(v -> showInbox());
         head.addView(inbox);
@@ -231,6 +248,105 @@ public class MainActivity extends Activity {
 
         setContentView(root);
         drawAll();
+    }
+
+    private void drawImage(final String prompt, final TextView out, final String key) {
+        out.setText("Rasm chizilmoqda...");
+        busy = true;
+        sendBtn.setEnabled(false);
+        new Thread(() -> {
+            Bitmap bm = null;
+            String err = "Rasm chizib bo\u2018lmadi. Boshqacha tasvirlab yozing yoki keyinroq urinib ko\u2018ring.";
+            try {
+                JSONObject body = new JSONObject()
+                        .put("contents", new JSONArray().put(new JSONObject().put("role", "user")
+                                .put("parts", new JSONArray().put(new JSONObject().put("text",
+                                        "Rasm chiz (draw an image): " + prompt)))))
+                        .put("generationConfig", new JSONObject()
+                                .put("responseModalities", new JSONArray().put("TEXT").put("IMAGE")));
+                URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent");
+                HttpURLConnection c = (HttpURLConnection) url.openConnection();
+                c.setRequestMethod("POST");
+                c.setConnectTimeout(20000);
+                c.setReadTimeout(120000);
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/json");
+                c.setRequestProperty("x-goog-api-key", key);
+                OutputStream os = c.getOutputStream();
+                os.write(body.toString().getBytes("UTF-8"));
+                os.close();
+                int code = c.getResponseCode();
+                InputStream is = code >= 200 && code < 300 ? c.getInputStream() : c.getErrorStream();
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                int r;
+                while (is != null && (r = is.read(buf)) > 0) bo.write(buf, 0, r);
+                String resp = bo.toString("UTF-8");
+                if (code == 429) {
+                    err = "Rasm chizish limiti tugadi. Keyinroq urinib ko\u2018ring.";
+                } else if (code >= 200 && code < 300) {
+                    JSONArray ps = new JSONObject(resp).getJSONArray("candidates").getJSONObject(0)
+                            .getJSONObject("content").getJSONArray("parts");
+                    for (int i = 0; i < ps.length(); i++) {
+                        JSONObject pt = ps.getJSONObject(i);
+                        JSONObject d = pt.optJSONObject("inlineData");
+                        if (d == null) d = pt.optJSONObject("inline_data");
+                        if (d != null) {
+                            byte[] raw = Base64.decode(d.getString("data"), Base64.DEFAULT);
+                            bm = BitmapFactory.decodeByteArray(raw, 0, raw.length);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+            final Bitmap fb = bm;
+            final String ferr = err;
+            runOnUiThread(() -> {
+                busy = false;
+                sendBtn.setEnabled(true);
+                if (fb == null) {
+                    out.setText(ferr);
+                    hist.remove(hist.size() - 1);
+                    saveHist();
+                    return;
+                }
+                chat.removeView(out);
+                ImageView iv = new ImageView(this);
+                iv.setImageBitmap(fb);
+                iv.setAdjustViewBounds(true);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(300), ViewGroup.LayoutParams.WRAP_CONTENT);
+                lp.setMargins(0, dp(5), 0, dp(5));
+                chat.addView(iv, lp);
+                Button sv = new Button(this);
+                sv.setText("Galereyaga saqlash");
+                sv.setOnClickListener(v -> saveImage(fb));
+                chat.addView(sv);
+                hist.add(new String[]{"model", "[Rasm chizildi: " + prompt + "]"});
+                saveHist();
+                scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
+            });
+        }).start();
+    }
+
+    private void saveImage(Bitmap bm) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                ContentValues cv = new ContentValues();
+                cv.put(MediaStore.Images.Media.DISPLAY_NAME, "zafaron_" + System.currentTimeMillis() + ".png");
+                cv.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+                cv.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Zafaron");
+                Uri u = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+                OutputStream o = getContentResolver().openOutputStream(u);
+                bm.compress(Bitmap.CompressFormat.PNG, 100, o);
+                o.close();
+                Toast.makeText(this, "Galereyaga saqlandi", Toast.LENGTH_SHORT).show();
+            } else {
+                String r = MediaStore.Images.Media.insertImage(getContentResolver(), bm, "zafaron", "Zafaron");
+                Toast.makeText(this, r != null ? "Galereyaga saqlandi" : "Saqlab bo\u2018lmadi", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Saqlab bo\u2018lmadi", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showInbox() {
@@ -352,7 +468,7 @@ public class MainActivity extends Activity {
     private void drawAll() {
         chat.removeAllViews();
         bubble("Salom! Men Zafaronman, sun\u2019iy intellektman. Hamma narsadan so‘rang, telefon va televizor ta’miri bo‘yicha o‘rgataman. "
-                + "Rasm, video yoki matnli fayl yuborish uchun + tugmasini bosing.", false);
+                + "Rasm, video yoki matnli fayl yuborish uchun + tugmasini bosing. Rasm chizdirish uchun \u00abrasm chiz ...\u00bb deb yozing.", false);
         for (String[] m : hist) bubble(m[1], m[0].equals("user"));
         drawAtt();
     }
@@ -547,6 +663,11 @@ public class MainActivity extends Activity {
         busy = true;
         sendBtn.setEnabled(false);
         final int n = hist.size();
+        String lowq = shown.toLowerCase();
+        if (lowq.startsWith("rasm chiz") || lowq.startsWith("rasm yarat") || lowq.startsWith("/rasm")) {
+            drawImage(shown, out, key);
+            return;
+        }
 
         new Thread(() -> {
             String ans;
