@@ -598,7 +598,7 @@ public class MainActivity extends Activity {
                 while (is != null && (r = is.read(buf)) > 0) bo.write(buf, 0, r);
                 String resp = bo.toString("UTF-8");
                 if (code == 429) {
-                    err = "Rasm chizish limiti tugadi. Keyinroq urinib ko\u2018ring.";
+                    err = "Rasm chizish hozir band. Keyinroq urinib ko\u2018ring.";
                 } else if (code >= 200 && code < 300) {
                     JSONArray ps = new JSONObject(resp).getJSONArray("candidates").getJSONObject(0)
                             .getJSONObject("content").getJSONArray("parts");
@@ -964,12 +964,7 @@ public class MainActivity extends Activity {
             hi.setGravity(Gravity.CENTER);
             hi.setPadding(0, dp(18), 0, dp(14));
             box.addView(hi);
-            TextView pl = new TextView(this);
-            pl.setText("Bepul tarif");
-            pl.setTextColor(0xFFB5B5B5);
-            pl.setPadding(dp(18), dp(8), dp(18), dp(8));
-            pl.setBackground(rounded(0xFF262626, 20));
-            box.addView(pl);
+
             chat.addView(box, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(480)));
         }
         for (String[] m : hist) bubble(m[1], m[0].equals("user"));
@@ -1204,6 +1199,7 @@ public class MainActivity extends Activity {
                         : new String[]{MODEL, "gemini-flash-lite-latest"};
                 int code = 0;
                 String resp = "";
+                for (int round = 0; round < 3; round++) {
                 for (String mdl : models) {
                     URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/" + mdl + ":generateContent");
                     HttpURLConnection c = (HttpURLConnection) url.openConnection();
@@ -1225,6 +1221,12 @@ public class MainActivity extends Activity {
                     resp = bo.toString("UTF-8");
                     if (code != 429 && code != 503 && code != 404) break;
                 }
+                if (code != 429 && code != 503 && code != 404) break;
+                try {
+                    Thread.sleep(4000);
+                } catch (Exception ignored) {
+                }
+                }
                 if (code >= 200 && code < 300) {
                     JSONArray ps = new JSONObject(resp).getJSONArray("candidates").getJSONObject(0)
                             .getJSONObject("content").getJSONArray("parts");
@@ -1245,7 +1247,7 @@ public class MainActivity extends Activity {
                     if (code == 400 && msg.toLowerCase().contains("key")) {
                         ans = "Kalit noto‘g‘ri. Tepadagi «Kalit» tugmasi bilan yangisini kiriting.";
                     } else if (code == 429) {
-                        ans = "Bepul limit tugadi. Biroz kutib, qayta yuboring.";
+                        ans = "Zafaron hozir band. Bir ozdan keyin qayta yuboring.";
                     } else {
                         ans = "Xato (" + code + "). " + msg;
                     }
