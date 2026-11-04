@@ -70,7 +70,8 @@ tap "Orqaga"; sleep 1
 tap "≡"; sleep 1
 tap "Ulash"; sleep 1
 shot 06_ulash; has "Gmail"; has "Telefon raqam"
-tap "Orqaga"; sleep 1
+adb shell am start -S -n $PKG/.MainActivity >/dev/null; sleep 4
+shot 06b_chat
 
 tap "Savol yozing"
 adb shell input text "salom"
