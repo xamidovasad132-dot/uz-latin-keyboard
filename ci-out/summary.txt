@@ -1,0 +1,37 @@
+OK o'rnatildi
+OK ekranda bor: Kalit olish
+OK tap 'Kalitni shu'
+OK tap 'Saqlash'
+OK ekranda bor: Salom
+OK ekranda bor: Ulash
+OK tap '≡'
+OK ekranda bor: Yangi suhbat
+OK ekranda bor: Video yasash
+OK tap 'Video yasash'
+OK tap 'Har qatorga'
+OK tap 'Videoni yasash'
+total 2496
+-rwxrwx--- 1 u0_a164 media_rw 2551602 2026-11-04 09:14 zafaron_1793783662646.mp4
+OK ekranda bor: Tayyor
+OK tap 'Orqaga'
+OK tap '≡'
+OK tap 'Ulash'
+OK ekranda bor: Gmail
+OK ekranda bor: Telefon raqam
+FAIL tap 'Orqaga'
+FAIL tap 'Savol yozing'
+FAIL tap '↑'
+Javob ekranidagi matn:
+text=""
+text=""
+text=""
+text=""
+text=""
+text=""
+text="≡"
+text="Ulash"
+text="Qaysi hisobdan kelgan xabarlar o‘zbekcha aytilishini o‘zingiz tanlaysiz. Parol so‘ralmaydi. Avval pastdagi ruxsatni bering, keyin har birini kiritib «Ulash» ni bosing."
+text="Ruxsat berish (bildirishnomalarni o‘qish)"
+text="Email (Gmail)"
+text="Gmail manzilingiz: ism@gmail.com"
+Qulashlar soni: 0
