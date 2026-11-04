@@ -1,0 +1,36 @@
+OK o'rnatildi
+OK ekranda bor: Kalit olish
+OK tap 'Kalitni shu'
+OK tap 'Saqlash'
+OK ekranda bor: Salom
+OK ekranda bor: Ulash
+OK tap '≡'
+OK ekranda bor: Yangi suhbat
+OK ekranda bor: Video yasash
+OK tap 'Video yasash'
+OK tap 'Har qatorga'
+OK tap 'Videoni yasash'
+total 2496
+-rwxrwx--- 1 u0_a161 media_rw 2551602 2026-11-04 09:20 zafaron_1793784026021.mp4
+OK ekranda bor: Tayyor
+OK tap 'Orqaga'
+OK tap '≡'
+OK tap 'Ulash'
+OK ekranda bor: Gmail
+OK ekranda bor: Telefon raqam
+OK tap 'Savol yozing'
+OK tap '↑'
+Javob ekranidagi matn:
+text=""
+text=""
+text=""
+text=""
+text=""
+text="≡"
+text=""
+text="Ulash"
+text=""
+text=""
+text="salom"
+text="Kalit noto‘g‘ri. Tepadagi «Kalit» tugmasi bilan yangisini kiriting."
+Qulashlar soni: 0
