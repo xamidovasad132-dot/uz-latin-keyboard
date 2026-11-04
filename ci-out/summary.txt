@@ -1,0 +1,36 @@
+OK o'rnatildi
+OK ekranda bor: Kalit olish
+OK tap 'Kalitni shu'
+OK tap 'Saqlash'
+OK ekranda bor: Salom
+OK ekranda bor: Ulash
+OK tap '≡'
+OK ekranda bor: Yangi suhbat
+OK ekranda bor: Video yasash
+OK tap 'Video yasash'
+OK tap 'Har qatorga'
+FAIL tap 'Videoni yasash'
+FAIL ekranda yo'q: Tayyor
+ls: /sdcard/Movies/Zafaron: No such file or directory
+FAIL tap 'Orqaga'
+FAIL tap '≡'
+FAIL tap 'Ulash'
+FAIL ekranda yo'q: Gmail
+FAIL ekranda yo'q: Telefon raqam
+FAIL tap 'Orqaga'
+FAIL tap 'Savol yozing'
+FAIL tap '↑'
+Javob ekranidagi matn:
+text=""
+text=""
+text=""
+text=""
+text=""
+text=""
+text=""
+text=""
+text=""
+text=""
+text=""
+text=""
+Qulashlar soni: 0
