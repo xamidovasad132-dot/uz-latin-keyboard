@@ -205,6 +205,13 @@ public class MainActivity extends Activity {
         });
         head.addView(pro);
         root.addView(head);
+        LinearLayout head2 = new LinearLayout(this);
+        head2.setOrientation(LinearLayout.HORIZONTAL);
+        head2.setPadding(dp(16), 0, dp(8), dp(4));
+        Button vid = small("Video yasash");
+        vid.setOnClickListener(v -> showVideo());
+        head2.addView(vid);
+        root.addView(head2);
 
         scroll = new ScrollView(this);
         chat = new LinearLayout(this);
@@ -347,6 +354,131 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             Toast.makeText(this, "Saqlab bo\u2018lmadi", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void showVideo() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
+        l.setBackgroundColor(BG);
+        l.setPadding(dp(16), dp(40), dp(16), dp(12));
+        TextView t = new TextView(this);
+        t.setText("Video yasash");
+        t.setTextSize(26);
+        t.setTypeface(null, Typeface.BOLD);
+        t.setTextColor(SAFFRON);
+        l.addView(t);
+        TextView info = new TextView(this);
+        info.setTextColor(INK);
+        info.setPadding(0, dp(6), 0, dp(6));
+        info.setText("Tez kesiladigan, pastda qalin yozuvli qisqa video. Har bir qator \u2014 bitta kadr. Mavzuni yozing va Zafaron matnni yozsin, yoki o\u2018zingiz yozing. Video ovozsiz chiqadi.");
+        l.addView(info);
+        final EditText topic = new EditText(this);
+        topic.setHint("Mavzu, masalan: qorong\u2018i uyda bir tun");
+        l.addView(topic);
+        final EditText lines = new EditText(this);
+        lines.setHint("Har qatorga bitta qisqa yozuv");
+        lines.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        lines.setMinLines(6);
+        lines.setGravity(Gravity.TOP);
+        final Button gen = new Button(this);
+        gen.setText("Matnni Zafaron yozsin");
+        final TextView status = new TextView(this);
+        status.setTextColor(INK);
+        gen.setOnClickListener(v -> {
+            String tp = topic.getText().toString().trim();
+            if (tp.isEmpty()) {
+                Toast.makeText(this, "Avval mavzuni yozing", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            status.setText("Yozilmoqda...");
+            final String key = sp.getString("key", "");
+            new Thread(() -> {
+                String r = null;
+                try {
+                    r = NotifService.ask(key, "\"" + tp + "\" mavzusida qisqa tez kesiladigan video uchun 8 ta juda qisqa yozuv yoz (har biri 1-4 so\u2018z), "
+                            + "o\u2018zbek tilida (lotin, \u015f \u00e7 \u00f6 \u011f harflari bilan). Qiziqarli boshla, oxirida kuchli xulosa. Faqat yozuvlar, har qatorga bittadan, raqamsiz.");
+                } catch (Exception ignored) {
+                }
+                final String fr = r;
+                runOnUiThread(() -> {
+                    if (fr == null || fr.isEmpty()) {
+                        status.setText("Matn olinmadi. Internetni va kalitni tekshiring.");
+                    } else {
+                        lines.setText(fr.replace("*", "").trim());
+                        status.setText("Tayyor. Xohlasangiz tahrir qiling.");
+                    }
+                });
+            }).start();
+        });
+        l.addView(gen);
+        l.addView(lines);
+        final Button make = new Button(this);
+        make.setText("Videoni yasash");
+        make.setOnClickListener(v -> {
+            final List<String> caps = new ArrayList<>();
+            for (String ln : lines.getText().toString().split("\n")) {
+                if (!ln.trim().isEmpty()) caps.add(ln.trim());
+            }
+            if (caps.isEmpty()) {
+                Toast.makeText(this, "Matn yozing", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            make.setEnabled(false);
+            status.setText("Video yasalmoqda: 0%");
+            new Thread(() -> {
+                Uri res = null;
+                String err = null;
+                try {
+                    java.io.File f = VideoMaker.make(this, caps, p -> runOnUiThread(() -> status.setText("Video yasalmoqda: " + p + "%")));
+                    res = saveVideo(f);
+                } catch (Throwable e) {
+                    err = "Video yasab bo\u2018lmadi (" + e.getClass().getSimpleName() + ")";
+                }
+                final Uri fu = res;
+                final String fe = err;
+                runOnUiThread(() -> {
+                    make.setEnabled(true);
+                    if (fu != null) {
+                        status.setText("Tayyor! Galereyada: Movies/Zafaron");
+                        Intent it = new Intent(Intent.ACTION_VIEW);
+                        it.setDataAndType(fu, "video/mp4");
+                        it.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        try {
+                            startActivity(it);
+                        } catch (Exception ignored) {
+                        }
+                    } else {
+                        status.setText(fe != null ? fe : "Saqlab bo\u2018lmadi");
+                    }
+                });
+            }).start();
+        });
+        l.addView(make);
+        l.addView(status);
+        Button back = new Button(this);
+        back.setText("Orqaga");
+        back.setOnClickListener(v -> showChat());
+        l.addView(back);
+        ScrollView sv = new ScrollView(this);
+        sv.addView(l);
+        setContentView(sv);
+    }
+
+    private Uri saveVideo(java.io.File f) throws Exception {
+        if (android.os.Build.VERSION.SDK_INT < 29) return null;
+        ContentValues cv = new ContentValues();
+        cv.put(MediaStore.Video.Media.DISPLAY_NAME, "zafaron_" + System.currentTimeMillis() + ".mp4");
+        cv.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+        cv.put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/Zafaron");
+        Uri u = getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, cv);
+        OutputStream o = getContentResolver().openOutputStream(u);
+        InputStream in = new java.io.FileInputStream(f);
+        byte[] buf = new byte[65536];
+        int n;
+        while ((n = in.read(buf)) > 0) o.write(buf, 0, n);
+        in.close();
+        o.close();
+        return u;
     }
 
     private void showInbox() {

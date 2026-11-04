@@ -73,7 +73,7 @@ public class NotifService extends NotificationListenerService {
         nm.notify((int) (System.nanoTime() & 0x7fffffff), b.build());
     }
 
-    private static String ask(String key, String prompt) throws Exception {
+    static String ask(String key, String prompt) throws Exception {
         JSONObject body = new JSONObject().put("contents", new JSONArray().put(new JSONObject().put("role", "user")
                 .put("parts", new JSONArray().put(new JSONObject().put("text", prompt)))));
         URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent");
