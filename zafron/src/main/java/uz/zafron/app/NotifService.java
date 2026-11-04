@@ -109,6 +109,11 @@ public class NotifService extends NotificationListenerService {
             Notification n = sbn.getNotification();
             if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) return;
             Bundle e = n.extras;
+            if (app.equals("Pochta")) {
+                String want = getSharedPreferences("z", Context.MODE_PRIVATE).getString("email_addr", "").toLowerCase();
+                CharSequence sub = e.getCharSequence(Notification.EXTRA_SUB_TEXT);
+                if (!want.isEmpty() && sub != null && !sub.toString().toLowerCase().contains(want)) return;
+            }
             CharSequence title = e.getCharSequence(Notification.EXTRA_TITLE);
             CharSequence text = e.getCharSequence(Notification.EXTRA_BIG_TEXT);
             if (text == null) text = e.getCharSequence(Notification.EXTRA_TEXT);

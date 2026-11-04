@@ -5,6 +5,10 @@ import android.content.ClipData;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Shader;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -53,13 +57,13 @@ public class MainActivity extends Activity {
     private static final String PRO = "gemini-pro-latest";
     private static final int PICK = 11;
     private static final int SAFFRON = 0xFFD9780F;
-    private static final int INK = 0xFF1D1A16;
-    private static final int BG = 0xFFF6F3EE;
+    private static final int INK = 0xFFEDEDED;
+    private static final int BG = 0xFF161616;
 
     private static final String SYSTEM =
             "Sen Zafaron — sun’iy intellektsan, har qanday mavzuda yordam beradigan aqlli yordamchisan (ta’lim, fan, tarix, til, "
             + "matematika, dasturlash, sog‘liq haqida umumiy ma’lumot, biznes, hayotiy maslahatlar, tarjima, yozish) "
-            + "va ayniqsa telemasterlik (telefon va televizor ta’miri) bo‘yicha tajribali ustozsan. "
+            + "Asosiy ixtisosing — telemasterlik (telefon va televizor ta’miri): bu mavzuda eng chuqur va aniq javob ber. "
             + "Har qanday savolga to‘liq, aniq javob ber; bilmasang, bilmasligingni ayt. Boshqa tilda yozishsa, shu tilda javob ber. "
             + "O‘zbek tilida (lotin yozuvi, ş ç ö ğ harflari bilan: o‘→ö, g‘→ğ, sh→ş, ch→ç) "
             + "qisqa va tushunarli javob ber. Foydalanuvchi texnik odam emas: qadam-baqadam tushuntir, murakkab so‘zni oddiy so‘z bilan izohla. "
@@ -156,6 +160,37 @@ public class MainActivity extends Activity {
 
     // ------------------------------------------------------------ chat UI
 
+    private GradientDrawable rounded(int color, int radiusDp) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(dp(radiusDp));
+        return g;
+    }
+
+    private ImageView roundLogo(int sizeDp) {
+        int px = dp(sizeDp);
+        Bitmap src = BitmapFactory.decodeResource(getResources(), R.drawable.zlogo);
+        Bitmap out = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(out);
+        Paint pt = new Paint(Paint.ANTI_ALIAS_FLAG);
+        pt.setShader(new BitmapShader(Bitmap.createScaledBitmap(src, px, px, true), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
+        cv.drawCircle(px / 2f, px / 2f, px / 2f, pt);
+        ImageView iv = new ImageView(this);
+        iv.setImageBitmap(out);
+        return iv;
+    }
+
+    private TextView iconBtn(String s, View.OnClickListener l) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextSize(26);
+        t.setTextColor(INK);
+        t.setGravity(Gravity.CENTER);
+        t.setClickable(true);
+        t.setOnClickListener(l);
+        return t;
+    }
+
     private void showChat() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -164,68 +199,31 @@ public class MainActivity extends Activity {
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.setPadding(dp(16), dp(36), dp(8), dp(8));
-        TextView title = new TextView(this);
-        title.setText("Zafaron");
-        title.setTextSize(24);
-        title.setTypeface(null, Typeface.BOLD);
-        title.setTextColor(SAFFRON);
-        head.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        Button neu = small("Yangi");
-        neu.setOnClickListener(v -> {
-            if (busy) return;
-            hist.clear();
-            saveHist();
-            drawAll();
-        });
-        head.addView(neu);
-        Button share = small("Ulashish");
-        share.setOnClickListener(v -> {
-            String last = null;
-            for (int i = hist.size() - 1; i >= 0; i--) if (hist.get(i)[0].equals("model")) { last = hist.get(i)[1]; break; }
-            if (last == null) {
-                Toast.makeText(this, "Hozircha javob yo\u2018q", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            Intent it = new Intent(Intent.ACTION_SEND);
-            it.setType("text/plain");
-            it.putExtra(Intent.EXTRA_TEXT, last);
-            startActivity(Intent.createChooser(it, "Ulashish yoki saqlash"));
-        });
-        head.addView(share);
-        Button inbox = small("Xabarlar");
-        inbox.setOnClickListener(v -> showInbox());
-        head.addView(inbox);
-        final Button pro = small(sp.getBoolean("pro2", false) ? "Kuchli: ha" : "Kuchli: yo\u2018q");
-        pro.setOnClickListener(v -> {
-            boolean on = !sp.getBoolean("pro2", false);
-            sp.edit().putBoolean("pro2", on).apply();
-            pro.setText(on ? "Kuchli: ha" : "Kuchli: yo\u2018q");
-            Toast.makeText(this, on ? "Eng kuchli model yoqildi (sekinroq, limiti kamroq)" : "Tez model yoqildi", Toast.LENGTH_SHORT).show();
-        });
-        head.addView(pro);
+        head.setPadding(dp(8), dp(34), dp(16), dp(6));
+        head.addView(iconBtn("≡", v -> showDrawer()), new LinearLayout.LayoutParams(dp(52), dp(48)));
+        head.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
+        TextView ulash = new TextView(this);
+        ulash.setText("Ulash");
+        ulash.setTextColor(INK);
+        ulash.setTextSize(16);
+        ulash.setGravity(Gravity.CENTER);
+        ulash.setPadding(dp(18), 0, dp(18), 0);
+        ulash.setBackground(rounded(0xFF2B2B2B, 20));
+        ulash.setClickable(true);
+        ulash.setOnClickListener(v -> showConnect2());
+        head.addView(ulash, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(40)));
         root.addView(head);
-        LinearLayout head2 = new LinearLayout(this);
-        head2.setOrientation(LinearLayout.HORIZONTAL);
-        head2.setPadding(dp(16), 0, dp(8), dp(4));
-        Button vid = small("Video yasash");
-        vid.setOnClickListener(v -> showVideo());
-        head2.addView(vid);
-        Button connect = small("Ulash");
-        connect.setOnClickListener(v -> showInbox());
-        head2.addView(connect);
-        root.addView(head2);
 
         scroll = new ScrollView(this);
         chat = new LinearLayout(this);
         chat.setOrientation(LinearLayout.VERTICAL);
-        chat.setPadding(dp(12), dp(8), dp(12), dp(8));
+        chat.setPadding(dp(14), dp(8), dp(14), dp(8));
         scroll.addView(chat);
         root.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         attLabel = new TextView(this);
-        attLabel.setTextColor(0xFF6F685E);
-        attLabel.setPadding(dp(16), dp(4), dp(16), 0);
+        attLabel.setTextColor(0xFF9A9A9A);
+        attLabel.setPadding(dp(20), dp(4), dp(20), 0);
         attLabel.setVisibility(View.GONE);
         attLabel.setOnClickListener(v -> {
             pend.clear();
@@ -233,31 +231,338 @@ public class MainActivity extends Activity {
         });
         root.addView(attLabel);
 
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.BOTTOM);
-        row.setPadding(dp(8), dp(4), dp(8), dp(8));
-        Button plus = new Button(this);
-        plus.setText("+");
-        plus.setTextSize(20);
-        plus.setOnClickListener(v -> pick());
-        row.addView(plus, new LinearLayout.LayoutParams(dp(52), dp(48)));
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setBackground(rounded(0xFF222222, 30));
+        bar.setPadding(dp(8), dp(6), dp(8), dp(6));
+        TextView plus = iconBtn("+", v -> showAddSheet());
+        plus.setBackground(rounded(0xFF333333, 22));
+        bar.addView(plus, new LinearLayout.LayoutParams(dp(44), dp(44)));
         inp = new EditText(this);
-        inp.setHint("Savol yozing yoki rasm yuboring");
+        inp.setHint("Savol yozing");
+        inp.setHintTextColor(0xFF8A8A8A);
+        inp.setTextColor(INK);
+        inp.setBackground(null);
         inp.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
                 | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         inp.setMaxLines(5);
-        row.addView(inp, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        ilp.setMargins(dp(10), 0, dp(6), 0);
+        bar.addView(inp, ilp);
         sendBtn = new Button(this);
-        sendBtn.setText("Yuborish");
-        sendBtn.setTextColor(Color.WHITE);
-        sendBtn.setBackgroundColor(SAFFRON);
+        sendBtn.setText("↑");
+        sendBtn.setTextSize(20);
+        sendBtn.setTextColor(0xFF111111);
+        sendBtn.setMinWidth(0);
+        sendBtn.setMinimumWidth(0);
+        sendBtn.setPadding(0, 0, 0, 0);
+        sendBtn.setBackground(rounded(0xFFF2F2F2, 22));
         sendBtn.setOnClickListener(v -> send());
-        row.addView(sendBtn, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48)));
-        root.addView(row);
+        bar.addView(sendBtn, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        blp.setMargins(dp(12), dp(4), dp(12), dp(12));
+        root.addView(bar, blp);
 
         setContentView(root);
         drawAll();
+    }
+
+    // ---- "+" oynasi, yon menyu, sozlamalar, ulash ----
+
+    private void showAddSheet() {
+        LinearLayout v = new LinearLayout(this);
+        v.setOrientation(LinearLayout.VERTICAL);
+        v.setBackground(rounded(0xFF1E1E1E, 24));
+        v.setPadding(dp(16), dp(16), dp(16), dp(20));
+        TextView t = new TextView(this);
+        t.setText("Qo‘shish");
+        t.setTextSize(18);
+        t.setTypeface(null, Typeface.BOLD);
+        t.setTextColor(INK);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(0, 0, 0, dp(14));
+        v.addView(t);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        final android.app.AlertDialog[] dlg = new android.app.AlertDialog[1];
+        String[] names = {"Kamera", "Foto", "Fayllar"};
+        String[] icons = {"📷", "🖼", "📄"};
+        for (int i = 0; i < 3; i++) {
+            final int k = i;
+            TextView c = new TextView(this);
+            c.setText(icons[i] + "\n" + names[i]);
+            c.setTextColor(INK);
+            c.setTextSize(15);
+            c.setGravity(Gravity.CENTER);
+            c.setBackground(rounded(0xFF2A2A2A, 18));
+            c.setClickable(true);
+            c.setOnClickListener(x -> {
+                dlg[0].dismiss();
+                if (k == 0) camera();
+                else if (k == 1) pick("image/*");
+                else pick("*/*");
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(96), 1f);
+            lp.setMargins(dp(4), 0, dp(4), 0);
+            row.addView(c, lp);
+        }
+        v.addView(row);
+        dlg[0] = new android.app.AlertDialog.Builder(this).setView(v).create();
+        dlg[0].show();
+        if (dlg[0].getWindow() != null) {
+            dlg[0].getWindow().setGravity(Gravity.BOTTOM);
+            dlg[0].getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+        }
+    }
+
+    private Uri camUri;
+    private static final int CAM = 12;
+
+    private void camera() {
+        if (android.os.Build.VERSION.SDK_INT < 29) {
+            Toast.makeText(this, "Kamera uchun Android 10 yoki yangisi kerak. Foto tugmasidan foydalaning.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        try {
+            ContentValues cv = new ContentValues();
+            cv.put(MediaStore.Images.Media.DISPLAY_NAME, "zafaron_cam_" + System.currentTimeMillis() + ".jpg");
+            cv.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            cv.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Zafaron");
+            camUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+            Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            i.putExtra(MediaStore.EXTRA_OUTPUT, camUri);
+            startActivityForResult(i, CAM);
+        } catch (Exception e) {
+            Toast.makeText(this, "Kamerani ochib bo‘lmadi", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private TextView menuRow(String text, final Runnable r) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(19);
+        t.setTextColor(INK);
+        t.setPadding(dp(8), dp(16), dp(8), dp(16));
+        t.setClickable(true);
+        t.setOnClickListener(v -> r.run());
+        return t;
+    }
+
+    private void newChat() {
+        if (busy) return;
+        hist.clear();
+        saveHist();
+        showChat();
+    }
+
+    private void showDrawer() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(BG);
+        root.setPadding(dp(20), dp(40), dp(20), dp(16));
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        TextView name = new TextView(this);
+        name.setText("Zafaron");
+        name.setTextSize(30);
+        name.setTypeface(null, Typeface.BOLD);
+        name.setTextColor(INK);
+        top.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        top.addView(iconBtn("✕", v -> showChat()), new LinearLayout.LayoutParams(dp(48), dp(48)));
+        root.addView(top);
+
+        root.addView(menuRow("Video yasash", this::showVideo));
+        root.addView(menuRow("Xabarlar", this::showInbox));
+        root.addView(menuRow("Ulash", this::showConnect2));
+
+        TextView rec = new TextView(this);
+        rec.setText("So‘nggi savollar");
+        rec.setTextColor(0xFF9A9A9A);
+        rec.setPadding(dp(8), dp(18), 0, dp(6));
+        root.addView(rec);
+        ScrollView sv = new ScrollView(this);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        int shown = 0;
+        for (int i = hist.size() - 1; i >= 0 && shown < 10; i--) {
+            if (!hist.get(i)[0].equals("user")) continue;
+            String q = hist.get(i)[1].replace("\n", " ");
+            if (q.length() > 42) q = q.substring(0, 42) + "…";
+            list.addView(menuRow(q, this::showChat));
+            shown++;
+        }
+        sv.addView(list);
+        root.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        LinearLayout bottom = new LinearLayout(this);
+        bottom.setOrientation(LinearLayout.HORIZONTAL);
+        bottom.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView av = roundLogo(52);
+        av.setClickable(true);
+        av.setOnClickListener(v -> showSettings());
+        bottom.addView(av, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        bottom.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
+        Button nw = new Button(this);
+        nw.setText("+  Yangi suhbat");
+        nw.setAllCaps(false);
+        nw.setTextColor(0xFF111111);
+        nw.setBackground(rounded(0xFFF2F2F2, 28));
+        nw.setOnClickListener(v -> newChat());
+        bottom.addView(nw, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(52)));
+        root.addView(bottom);
+        setContentView(root);
+    }
+
+    private TextView card(String text, final Runnable r) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(17);
+        t.setTextColor(INK);
+        t.setPadding(dp(18), dp(18), dp(18), dp(18));
+        t.setBackground(rounded(0xFF222222, 16));
+        t.setClickable(true);
+        t.setOnClickListener(v -> r.run());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, dp(5), 0, dp(5));
+        t.setLayoutParams(lp);
+        return t;
+    }
+
+    private void showSettings() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
+        l.setBackgroundColor(BG);
+        l.setPadding(dp(16), dp(36), dp(16), dp(16));
+        LinearLayout top = new LinearLayout(this);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(iconBtn("≡", v -> showDrawer()), new LinearLayout.LayoutParams(dp(52), dp(48)));
+        TextView t = new TextView(this);
+        t.setText("Sozlamalar");
+        t.setTextSize(22);
+        t.setTypeface(null, Typeface.BOLD);
+        t.setTextColor(INK);
+        t.setPadding(dp(8), 0, 0, 0);
+        top.addView(t);
+        l.addView(top);
+        l.addView(card("Google kaliti", this::showSetup));
+        l.addView(card("Ulash (email, Telegram, telefon raqam)", this::showConnect2));
+        l.addView(card("Xabarlar", this::showInbox));
+        final TextView pro = card(sp.getBoolean("pro2", false) ? "Kuchli rejim: yoqilgan" : "Kuchli rejim: o‘chiq", () -> { });
+        pro.setOnClickListener(v -> {
+            boolean on = !sp.getBoolean("pro2", false);
+            sp.edit().putBoolean("pro2", on).apply();
+            pro.setText(on ? "Kuchli rejim: yoqilgan" : "Kuchli rejim: o‘chiq");
+        });
+        l.addView(pro);
+        l.addView(card("Suhbatni tozalash", this::newChat));
+        l.addView(card("Orqaga", this::showChat));
+        ScrollView sv = new ScrollView(this);
+        sv.setBackgroundColor(BG);
+        sv.addView(l);
+        setContentView(sv);
+    }
+
+    private void addSource(LinearLayout l, String label, final String pref, final String src,
+                           String hint, int type, final boolean required) {
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setTextSize(17);
+        t.setTypeface(null, Typeface.BOLD);
+        t.setTextColor(INK);
+        t.setPadding(0, dp(16), 0, dp(2));
+        l.addView(t);
+        final EditText e = new EditText(this);
+        e.setHint(hint);
+        e.setHintTextColor(0xFF8A8A8A);
+        e.setTextColor(INK);
+        e.setInputType(type);
+        e.setSingleLine(true);
+        e.setText(sp.getString(pref, ""));
+        l.addView(e);
+        final boolean on = sp.getBoolean("src_" + src, false);
+        Button b = new Button(this);
+        b.setAllCaps(false);
+        b.setText(on ? "Ulangan ✓  (uzish uchun bosing)" : "Ulash");
+        b.setOnClickListener(v -> {
+            if (on) {
+                sp.edit().putBoolean("src_" + src, false).apply();
+            } else {
+                String val = e.getText().toString().trim();
+                if (required && val.length() < 5) {
+                    Toast.makeText(this, "Avval maydonni to‘ldiring", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                sp.edit().putString(pref, val).putBoolean("src_" + src, true).apply();
+            }
+            showConnect2();
+        });
+        l.addView(b);
+    }
+
+    private void showConnect2() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
+        l.setBackgroundColor(BG);
+        l.setPadding(dp(16), dp(36), dp(16), dp(16));
+        LinearLayout top = new LinearLayout(this);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(iconBtn("≡", v -> showDrawer()), new LinearLayout.LayoutParams(dp(52), dp(48)));
+        TextView t = new TextView(this);
+        t.setText("Ulash");
+        t.setTextSize(22);
+        t.setTypeface(null, Typeface.BOLD);
+        t.setTextColor(INK);
+        top.addView(t);
+        l.addView(top);
+        TextView info = new TextView(this);
+        info.setTextColor(0xFFB5B5B5);
+        info.setPadding(0, dp(8), 0, dp(4));
+        info.setText("Qaysi hisobdan kelgan xabarlar o‘zbekcha aytilishini o‘zingiz tanlaysiz. Parol so‘ralmaydi. "
+                + "Avval pastdagi ruxsatni bering, keyin har birini kiritib «Ulash» ni bosing.");
+        l.addView(info);
+        Button perm = new Button(this);
+        perm.setAllCaps(false);
+        perm.setText("Ruxsat berish (bildirishnomalarni o‘qish)");
+        perm.setOnClickListener(v -> {
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 6);
+            }
+            startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+        });
+        l.addView(perm);
+        addSource(l, "Email (Gmail)", "email_addr", "Pochta", "Gmail manzilingiz: ism@gmail.com",
+                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, true);
+        addSource(l, "Telegram", "tg_name", "Telegram", "Telegram nomingiz: @nom (ixtiyoriy)",
+                InputType.TYPE_CLASS_TEXT, false);
+        addSource(l, "Telefon raqam (SMS)", "phone", "SMS", "+998 90 123 45 67",
+                InputType.TYPE_CLASS_PHONE, true);
+        Button bat = new Button(this);
+        bat.setAllCaps(false);
+        bat.setText("Orqa fonda ishlashga ruxsat (batareya)");
+        bat.setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())));
+            } catch (Exception e) {
+                startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+            }
+        });
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        blp.setMargins(0, dp(20), 0, 0);
+        l.addView(bat, blp);
+        Button back = new Button(this);
+        back.setText("Orqaga");
+        back.setOnClickListener(v -> showChat());
+        l.addView(back);
+        ScrollView sv = new ScrollView(this);
+        sv.setBackgroundColor(BG);
+        sv.addView(l);
+        setContentView(sv);
     }
 
     private void drawImage(final String prompt, final TextView out, final String key) {
@@ -646,8 +951,27 @@ public class MainActivity extends Activity {
 
     private void drawAll() {
         chat.removeAllViews();
-        bubble("Salom! Men Zafaronman, sun\u2019iy intellektman. Hamma narsadan so‘rang, telefon va televizor ta’miri bo‘yicha o‘rgataman. "
-                + "Rasm, video yoki matnli fayl yuborish uchun + tugmasini bosing. Rasm chizdirish uchun \u00abrasm chiz ...\u00bb deb yozing.", false);
+        if (hist.isEmpty()) {
+            LinearLayout box = new LinearLayout(this);
+            box.setOrientation(LinearLayout.VERTICAL);
+            box.setGravity(Gravity.CENTER);
+            box.addView(roundLogo(96), new LinearLayout.LayoutParams(dp(96), dp(96)));
+            TextView hi = new TextView(this);
+            hi.setText("Salom!");
+            hi.setTextSize(32);
+            hi.setTypeface(Typeface.SERIF);
+            hi.setTextColor(INK);
+            hi.setGravity(Gravity.CENTER);
+            hi.setPadding(0, dp(18), 0, dp(14));
+            box.addView(hi);
+            TextView pl = new TextView(this);
+            pl.setText("Bepul tarif");
+            pl.setTextColor(0xFFB5B5B5);
+            pl.setPadding(dp(18), dp(8), dp(18), dp(8));
+            pl.setBackground(rounded(0xFF262626, 20));
+            box.addView(pl);
+            chat.addView(box, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(480)));
+        }
         for (String[] m : hist) bubble(m[1], m[0].equals("user"));
         drawAtt();
     }
@@ -660,14 +984,8 @@ public class MainActivity extends Activity {
         t.setPadding(dp(14), dp(10), dp(14), dp(10));
         GradientDrawable g = new GradientDrawable();
         g.setCornerRadius(dp(14));
-        if (me) {
-            g.setColor(INK);
-            t.setTextColor(BG);
-        } else {
-            g.setColor(Color.WHITE);
-            g.setStroke(dp(1), 0xFFE2DCD2);
-            t.setTextColor(INK);
-        }
+        g.setColor(me ? 0xFF2B2B2B : Color.TRANSPARENT);
+        t.setTextColor(INK);
         t.setBackground(g);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -708,10 +1026,10 @@ public class MainActivity extends Activity {
 
     // ------------------------------------------------------------ attachments
 
-    private void pick() {
+    private void pick(String type) {
         Intent i = new Intent(Intent.ACTION_GET_CONTENT);
-        i.setType("*/*");
-        i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*", "text/*", "application/json"});
+        i.setType(type);
+        if (type.equals("*/*")) i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*", "text/*", "application/json"});
         i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         startActivityForResult(i, PICK);
@@ -720,7 +1038,11 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
-        if (req != PICK || res != RESULT_OK || data == null) return;
+        if (req == CAM && res == RESULT_OK && camUri != null) {
+            data = new Intent().setData(camUri);
+        } else if (req != PICK || res != RESULT_OK || data == null) {
+            return;
+        }
         final List<Uri> uris = new ArrayList<>();
         ClipData cd = data.getClipData();
         if (cd != null) {
@@ -834,6 +1156,7 @@ public class MainActivity extends Activity {
         for (Pending p : files) label += "\n📎 " + p.name;
 
         hist.add(new String[]{"user", label});
+        if (hist.size() == 1) chat.removeAllViews();
         pend.clear();
         inp.setText("");
         drawAtt();
