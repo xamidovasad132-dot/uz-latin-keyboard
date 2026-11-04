@@ -1192,15 +1192,17 @@ public class MainActivity extends Activity {
                         .put("system_instruction", new JSONObject()
                                 .put("parts", new JSONArray().put(new JSONObject().put("text", SYSTEM))))
                         .put("contents", contents);
-                body.put("tools", new JSONArray().put(new JSONObject().put("google_search", new JSONObject())));
 
                 String[] models = sp.getBoolean("pro2", false)
-                        ? new String[]{PRO, MODEL, "gemini-flash-lite-latest"}
-                        : new String[]{MODEL, "gemini-flash-lite-latest"};
+                        ? new String[]{"gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite", MODEL}
+                        : new String[]{"gemini-2.5-flash", "gemini-2.5-flash-lite", MODEL};
                 int code = 0;
                 String resp = "";
                 for (int round = 0; round < 3; round++) {
                 for (String mdl : models) {
+                for (int tool = 1; tool >= 0; tool--) {
+                    if (tool == 1) body.put("tools", new JSONArray().put(new JSONObject().put("google_search", new JSONObject())));
+                    else body.remove("tools");
                     URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/" + mdl + ":generateContent");
                     HttpURLConnection c = (HttpURLConnection) url.openConnection();
                     c.setRequestMethod("POST");
@@ -1219,6 +1221,8 @@ public class MainActivity extends Activity {
                     int r;
                     while (is != null && (r = is.read(buf)) > 0) bo.write(buf, 0, r);
                     resp = bo.toString("UTF-8");
+                    if (code != 429) break;
+                }
                     if (code != 429 && code != 503 && code != 404) break;
                 }
                 if (code != 429 && code != 503 && code != 404) break;
@@ -1247,7 +1251,7 @@ public class MainActivity extends Activity {
                     if (code == 400 && msg.toLowerCase().contains("key")) {
                         ans = "Kalit noto‘g‘ri. Yon menyudagi logoni bosing → Sozlamalar → Google kaliti.";
                     } else if (code == 429) {
-                        ans = "Zafaron hozir band. Bir ozdan keyin qayta yuboring.";
+                        ans = "Zafaron hozir band. Bir ozdan keyin qayta yuboring." + (msg.isEmpty() ? "" : "\n(" + msg.substring(0, Math.min(140, msg.length())) + ")");
                     } else {
                         ans = "Xato (" + code + "). " + msg;
                     }
